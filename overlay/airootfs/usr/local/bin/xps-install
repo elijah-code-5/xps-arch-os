@@ -1,0 +1,15 @@
+#!/bin/bash
+# Guided installer: archinstall with the XPS Arch OS settings preloaded.
+# You only choose the disk, your username and password.
+echo "=== XPS Arch OS installer ==="
+echo "This needs internet (the software is downloaded while installing)."
+if ! nm-online -q -t 10; then
+    echo
+    echo "You are not online. Close this window, click the network icon at the"
+    echo "top right to join Wi-Fi, then open 'Install XPS Arch OS' again."
+    read -r -p "Press Enter to close. "
+    exit 1
+fi
+archinstall --config /usr/share/xps-arch-os/archinstall.json
+echo
+read -r -p "Finished. Press Enter to close, then reboot from the menu. "

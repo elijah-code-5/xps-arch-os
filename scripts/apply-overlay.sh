@@ -6,14 +6,15 @@ set -euo pipefail
 PROFILE="${1:?usage: apply-overlay.sh <profile-dir>}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Extra packages
-grep -vE '^\s*(#|$)' "$HERE/overlay/packages.extra" >> "$PROFILE/packages.x86_64"
-
-# Extra package repo (chaotic-aur: Calamares, Arduino IDE)
-cat "$HERE/overlay/pacman.append" >> "$PROFILE/pacman.conf"
+# Small live desktop packages
+grep -vE '^\s*(#|$)' "$HERE/overlay/packages.live" >> "$PROFILE/packages.x86_64"
 
 # Our files on top of the live system
 cp -a "$HERE/overlay/airootfs/." "$PROFILE/airootfs/"
+
+# Installer settings (package list + tuning files) for archinstall
+python3 "$HERE/scripts/make-archinstall-config.py" "$HERE" \
+  "$PROFILE/airootfs/usr/share/xps-arch-os/archinstall.json"
 
 # NetworkManager replaces the stock live networking
 rm -f "$PROFILE/airootfs/etc/systemd/system/multi-user.target.wants/systemd-networkd.service" \
@@ -28,6 +29,9 @@ sed -i \
   -e 's|^iso_label=.*|iso_label="XPSARCH_$(date +%Y%m)"|' \
   -e 's|^iso_application=.*|iso_application="XPS Arch OS Live/Install"|' \
   "$PROFILE/profiledef.sh"
-echo 'file_permissions+=(["/usr/local/bin/create-live-user"]="0:0:755")' >> "$PROFILE/profiledef.sh"
+{
+  echo 'file_permissions+=(["/usr/local/bin/create-live-user"]="0:0:755")'
+  echo 'file_permissions+=(["/usr/local/bin/xps-install"]="0:0:755")'
+} >> "$PROFILE/profiledef.sh"
 
 echo "Overlay applied to $PROFILE"

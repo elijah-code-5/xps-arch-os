@@ -41,14 +41,7 @@ bluez
 bluez-utils
 blueman
 
-# Installer (Calamares comes from the chaotic-aur repo)
-calamares
-ckbcomp
-grub
-efibootmgr
-os-prober
 rsync
-squashfs-tools
 dosfstools
 ntfs-3g
 exfatprogs
@@ -76,11 +69,11 @@ python
 python-pip
 code
 arduino-cli
-arduino-ide-bin
 firefox
 vlc
 shotcut
 nextcloud-client
+flatpak
 
 # Everyday terminal tools
 nano

@@ -1,0 +1,23 @@
+# Small live desktop; the full software list is installed by the installer (packages.installed)
+exo
+garcon
+thunar
+thunar-volman
+tumbler
+xfce4-appfinder
+xfce4-panel
+xfce4-session
+xfce4-settings
+xfce4-terminal
+xfconf
+xfdesktop
+xfwm4
+lightdm
+lightdm-gtk-greeter
+networkmanager
+network-manager-applet
+firefox
+noto-fonts
+xdg-user-dirs
+earlyoom
+zram-generator

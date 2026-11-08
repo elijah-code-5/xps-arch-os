@@ -31,9 +31,9 @@ cat > "$home/Desktop/install.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Install XPS Arch OS
-Exec=sudo -E calamares
-Icon=calamares
-Terminal=false
+Exec=sudo /usr/local/bin/xps-install
+Icon=system-software-install
+Terminal=true
 EOF
 chmod +x "$home/Desktop/install.desktop"
 cp "$home/Desktop/install.desktop" "$home/.config/autostart/install.desktop"
