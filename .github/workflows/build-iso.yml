@@ -31,6 +31,11 @@ jobs:
             'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
             'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
 
+      - name: List what chaotic-aur offers for our packages
+        run: |
+          pacman -Sy
+          pacman -Sl chaotic-aur | grep -iE ' (calamares|ckbcomp|arduino)' || echo "none found"
+
       - name: Prepare the ISO profile
         run: |
           cp -r /usr/share/archiso/configs/releng profile
