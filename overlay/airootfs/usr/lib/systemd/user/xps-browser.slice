@@ -1,0 +1,7 @@
+[Unit]
+Description=Browser: capped so tabs cannot starve compiles
+
+[Slice]
+MemoryHigh=6G
+MemoryMax=10G
+CPUWeight=100

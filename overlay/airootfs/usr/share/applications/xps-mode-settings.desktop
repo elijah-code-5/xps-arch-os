@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mode times
+Comment=Change when learning and coding time start and end
+Exec=xps-mode-settings
+Icon=preferences-system-time
+Categories=Settings;

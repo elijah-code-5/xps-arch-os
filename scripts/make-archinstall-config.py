@@ -10,38 +10,60 @@ import sys
 
 root = pathlib.Path(sys.argv[1])
 out = pathlib.Path(sys.argv[2])
-overlay = root / "overlay"
+airootfs = root / "overlay" / "airootfs"
 
 packages = [
     line.strip()
-    for line in (overlay / "packages.installed").read_text().splitlines()
+    for line in (root / "overlay" / "packages.installed").read_text().splitlines()
     if line.strip() and not line.lstrip().startswith("#")
 ]
 
-# Files from the overlay that also go onto the installed system.
-carry = [
-    "/etc/systemd/zram-generator.conf",
-    "/etc/sysctl.d/99-xps-memory.conf",
-    "/etc/default/earlyoom",
-    "/etc/modprobe.d/blacklist-nouveau.conf",
-    "/etc/udev/rules.d/50-serial-uaccess.rules",
-    "/usr/lib/firefox/distribution/policies.json",
+# Overlay files that also go onto the installed system.
+carry_files = [
+    "etc/systemd/zram-generator.conf",
+    "etc/default/earlyoom",
+    "usr/local/bin/xps-mode",
+    "usr/local/bin/xps-mode-settings",
+    "usr/local/bin/xps-first-login",
+]
+carry_dirs = [
+    "etc/skel",
+    "etc/profile.d",
+    "etc/sysctl.d",
+    "etc/modprobe.d",
+    "etc/udev/rules.d",
+    "etc/systemd/journald.conf.d",
+    "usr/lib/systemd/user",
+    "usr/share/applications",
+    "usr/lib/firefox",
 ]
 
-commands = []
-for path in carry:
-    data = (overlay / "airootfs" / path.lstrip("/")).read_bytes()
-    encoded = base64.b64encode(data).decode()
-    folder = str(pathlib.PurePosixPath(path).parent)
-    commands.append(f"mkdir -p {folder} && echo {encoded} | base64 -d > {path}")
+paths = list(carry_files)
+for d in carry_dirs:
+    for f in sorted((airootfs / d).rglob("*")):
+        if f.is_file() and not f.is_symlink():
+            paths.append(str(f.relative_to(airootfs)))
 
-commands.append(
-    "systemctl enable lightdm NetworkManager earlyoom tlp thermald bluetooth"
-)
-commands.append(
-    "flatpak remote-add --if-not-exists flathub "
-    "https://dl.flathub.org/repo/flathub.flatpakrepo || true"
-)
+commands = []
+for rel in paths:
+    target = "/" + rel
+    folder = str(pathlib.PurePosixPath(target).parent)
+    encoded = base64.b64encode((airootfs / rel).read_bytes()).decode()
+    commands.append(
+        f'mkdir -p "{folder}" && echo {encoded} | base64 -d > "{target}"'
+    )
+
+commands += [
+    "chmod +x /usr/local/bin/xps-mode /usr/local/bin/xps-mode-settings /usr/local/bin/xps-first-login",
+    # Home folders already exist when these commands run, so give them the skel files.
+    'for d in /home/*/; do u=$(basename "$d"); cp -rn /etc/skel/. "$d" && chown -R "$u":"$(id -gn "$u")" "$d"; done',
+    # Learning/coding/free mode timer for every user
+    "systemctl --global enable xps-mode-auto.timer",
+    # raspberrypi.local style names for the Pi server
+    "sed -i 's/^hosts:.*/hosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns/' /etc/nsswitch.conf",
+    "systemctl enable lightdm NetworkManager earlyoom tlp thermald bluetooth avahi-daemon",
+    "flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true",
+]
 
 config = {
     "hostname": "xps-arch",

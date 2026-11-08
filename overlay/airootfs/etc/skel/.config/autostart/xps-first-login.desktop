@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=XPS first-login setup
+Exec=xps-first-login
+X-GNOME-Autostart-Delay=30

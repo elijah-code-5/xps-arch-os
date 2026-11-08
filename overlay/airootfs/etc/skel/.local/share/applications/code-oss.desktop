@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Code - OSS
+Comment=Code editing, redefined
+Exec=systemd-run --user --scope --slice=xps-build.slice -q code %F
+Icon=code-oss
+Terminal=false
+Categories=Utility;TextEditor;Development;IDE;
+MimeType=text/plain;inode/directory;
+StartupNotify=true

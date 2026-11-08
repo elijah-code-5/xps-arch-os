@@ -82,3 +82,20 @@ htop
 btop
 man-db
 sudo
+
+# ESP32 robot / T-HMI / Pi server workflow
+esptool
+python-pyserial
+python-pipx
+thonny
+avahi
+nss-mdns
+openssh
+picocom
+gvfs-smb
+gvfs-nfs
+gvfs-dnssd
+gvfs-mtp
+udisks2
+yad
+libnotify

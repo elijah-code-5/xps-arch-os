@@ -1,0 +1,22 @@
+#!/bin/bash
+# Runs quietly in the background after the first login: sets up ESP32 support once.
+[ -d /run/archiso ] && exit 0
+done_file="${XDG_STATE_HOME:-$HOME/.local/state}/xps-first-login-done"
+[ -f "$done_file" ] && exit 0
+command -v arduino-cli >/dev/null || exit 0
+mkdir -p "$(dirname "$done_file")"
+
+until nm-online -q -t 30; do sleep 30; done
+
+nice -n 19 ionice -c3 bash -c '
+    arduino-cli config init >/dev/null 2>&1 || true
+    arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+    arduino-cli core update-index
+    arduino-cli core install esp32:esp32 || exit 1
+    command -v pipx >/dev/null && pipx install mpremote
+    exit 0
+' && {
+    touch "$done_file"
+    command -v notify-send >/dev/null && notify-send -a "XPS Arch OS" "ESP32 support is ready" "Arduino ESP32 boards (robot, T-HMI) and mpremote are installed."
+}
+exit 0

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Firefox
+Comment=Browse the Web
+Exec=systemd-run --user --scope --slice=xps-browser.slice -q firefox %u
+Icon=firefox
+Terminal=false
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+StartupNotify=true

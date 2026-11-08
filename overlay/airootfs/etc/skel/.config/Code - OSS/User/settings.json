@@ -1,0 +1,19 @@
+{
+  "telemetry.telemetryLevel": "off",
+  "update.mode": "none",
+  "extensions.autoUpdate": false,
+  "workbench.enableExperiments": false,
+  "editor.minimap.enabled": false,
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/node_modules/**": true,
+    "**/.pio/**": true,
+    "**/build/**": true,
+    "**/.venv/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.pio": true,
+    "**/build": true
+  }
+}
