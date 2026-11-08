@@ -1,0 +1,12 @@
+[Unit]
+Description=Create the live session user (live USB only)
+ConditionPathExists=/run/archiso
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/create-live-user
+
+[Install]
+WantedBy=multi-user.target

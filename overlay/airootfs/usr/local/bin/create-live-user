@@ -1,0 +1,40 @@
+#!/bin/bash
+# Runs only on the live USB (see live-user.service). Everything is created at
+# runtime so none of it is copied onto the installed system.
+set -e
+id liveuser &>/dev/null && exit 0
+
+groupadd -rf autologin
+groupadd -rf nopasswdlogin
+
+groups=""
+for g in wheel audio video storage optical network uucp autologin nopasswdlogin; do
+    getent group "$g" >/dev/null && groups="${groups:+$groups,}$g"
+done
+
+useradd -m -G "$groups" -s /bin/bash liveuser
+passwd -d liveuser
+
+echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/99-live
+chmod 440 /etc/sudoers.d/99-live
+
+mkdir -p /etc/lightdm/lightdm.conf.d
+cat > /etc/lightdm/lightdm.conf.d/50-live.conf <<EOF
+[Seat:*]
+autologin-user=liveuser
+autologin-session=xfce
+EOF
+
+home=/home/liveuser
+mkdir -p "$home/Desktop" "$home/.config/autostart"
+cat > "$home/Desktop/install.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Install XPS Arch OS
+Exec=sudo -E calamares
+Icon=calamares
+Terminal=false
+EOF
+chmod +x "$home/Desktop/install.desktop"
+cp "$home/Desktop/install.desktop" "$home/.config/autostart/install.desktop"
+chown -R liveuser:liveuser "$home"
