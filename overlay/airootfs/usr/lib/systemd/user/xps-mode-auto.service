@@ -1,5 +1,5 @@
 [Unit]
-Description=Pick the learning/coding/free mode from the clock
+Description=Pick the coding/free mode from the clock
 
 [Service]
 Type=oneshot

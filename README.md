@@ -14,8 +14,8 @@ coding (VS Code, Arduino), online lessons, lots of browser tabs and music.
 
 ## Get the ISO (no terminal needed)
 
-1. On GitHub open the **Actions** tab, then **Build ISO**, then **Run workflow**.
-2. When it turns green, open the run and download **xps-arch-os-iso** (a zip containing the `.iso`).
+1. Open the repo's **Releases** (right side of the main page) and download the newest `.iso`.
+   (Builds run in **Actions** and publish there automatically.)
 3. Test it in a VM (VirtualBox or virt-manager, enable EFI, 4 GB RAM, 30 GB disk).
 4. To put it on a USB stick use Balena Etcher.
 
@@ -31,16 +31,13 @@ Next planned: native Nextcloud connection to the Pi server.
 
 ## Modes (automatic by time of day)
 
-Default schedule, weekdays: **Learning 08:00-13:00**, **Coding 13:00-18:00**, free otherwise.
-Weekends are coding-only 08:00-18:00. Change any time in the menu: **Mode times**.
+School is on the tablet, so this laptop only has two modes: **Coding** (default 13:00-18:00 weekdays,
+08:00-18:00 weekends) and **Free**. Change the times in the menu: **Mode times**.
 
-- **Learning:** Firefox opens and gets CPU priority; notifications paused.
 - **Coding:** VS Code opens and compiles get CPU priority and protected memory; notifications paused.
 - **Free:** everything normal.
 
 Browser memory is capped (soft 6 GB, hard 10 GB) so 24 tabs can never starve your compiler.
-Firefox and VS Code launched from the menu are placed in those groups automatically.
-Switch by hand any time from the menu: Mode: Learning / Coding / Free time.
 
 ## Robot / T-HMI / Pi
 

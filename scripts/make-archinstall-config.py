@@ -57,7 +57,7 @@ commands += [
     "chmod +x /usr/local/bin/xps-mode /usr/local/bin/xps-mode-settings /usr/local/bin/xps-first-login",
     # Home folders already exist when these commands run, so give them the skel files.
     'for d in /home/*/; do u=$(basename "$d"); cp -rn /etc/skel/. "$d" && chown -R "$u":"$(id -gn "$u")" "$d"; done',
-    # Learning/coding/free mode timer for every user
+    # Coding/free mode timer for every user
     "systemctl --global enable xps-mode-auto.timer",
     # raspberrypi.local style names for the Pi server
     "sed -i 's/^hosts:.*/hosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns/' /etc/nsswitch.conf",

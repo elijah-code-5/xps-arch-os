@@ -9,6 +9,9 @@ on:
       - "scripts/**"
       - ".github/workflows/build-iso.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -48,3 +51,10 @@ jobs:
           path: out/*.iso
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish as a release (public link, resumable download)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: iso-${{ github.run_number }}
+          name: XPS Arch OS ISO ${{ github.run_number }}
+          files: out/*.iso

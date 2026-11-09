@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Mode: Learning
-Comment=Browser first, notifications paused
-Exec=xps-mode learning
-Icon=applications-education
-Categories=Utility;

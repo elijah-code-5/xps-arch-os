@@ -87,7 +87,6 @@ sudo
 esptool
 python-pyserial
 python-pipx
-thonny
 avahi
 nss-mdns
 openssh
@@ -99,3 +98,9 @@ gvfs-mtp
 udisks2
 yad
 libnotify
+
+# Office and notes (files sync to your Nextcloud via nextcloud-client)
+libreoffice-fresh
+hunspell-en_us
+xournalpp
+evince

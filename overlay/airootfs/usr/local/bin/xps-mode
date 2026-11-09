@@ -1,6 +1,6 @@
 #!/bin/bash
-# xps-mode: switch between learning, coding and free mode.
-#   xps-mode learning|coding|free   switch now and open that mode's apps
+# xps-mode: switch between coding and free mode (school is on the tablet).
+#   xps-mode coding|free            switch now and open that mode's apps
 #   xps-mode auto [--launch]        pick the mode from the clock (a timer runs this every 15 min)
 #   xps-mode pick                   only print the mode the clock says (for testing)
 [ -d /run/archiso ] && exit 0   # not on the live USB
@@ -8,11 +8,10 @@
 conf="${XDG_CONFIG_HOME:-$HOME/.config}/xps-modes/schedule.conf"
 state="${XDG_STATE_HOME:-$HOME/.local/state}/xps-mode"
 
-LEARN_START=08:00
-LEARN_END=13:00
 CODE_START=13:00
 CODE_END=18:00
 WEEKEND=coding
+WEEKEND_START=08:00
 [ -f "$conf" ] && . "$conf"
 
 mins() { local h=${1%%:*} m=${1##*:}; echo $((10#$h * 60 + 10#$m)); }
@@ -23,8 +22,7 @@ pick() {
     dow=$(date -d "${XPS_NOW:-now}" +%u)
     in_range() { [ "$now" -ge "$(mins "$1")" ] && [ "$now" -lt "$(mins "$2")" ]; }
     if [ "$dow" -ge 6 ]; then
-        if [ "$WEEKEND" = coding ] && in_range "$LEARN_START" "$CODE_END"; then echo coding; else echo free; fi
-    elif in_range "$LEARN_START" "$LEARN_END"; then echo learning
+        if [ "$WEEKEND" = coding ] && in_range "$WEEKEND_START" "$CODE_END"; then echo coding; else echo free; fi
     elif in_range "$CODE_START" "$CODE_END"; then echo coding
     else echo free
     fi
@@ -41,10 +39,6 @@ weights() {
     return 0
 }
 
-start_browser() {
-    pgrep -x firefox >/dev/null && return 0
-    systemd-run --user --scope --slice=xps-browser.slice -q firefox >/dev/null 2>&1 &
-}
 start_code() {
     pgrep -x code >/dev/null && return 0
     systemd-run --user --scope --slice=xps-build.slice -q code >/dev/null 2>&1 &
@@ -56,10 +50,6 @@ apply() {
     mkdir -p "$(dirname "$state")"
     echo "$mode" > "$state"
     case "$mode" in
-        learning)
-            [ "$prev" != learning ] && say "Learning time" "Browser gets priority. Notifications are paused."
-            weights 800 100; dnd true
-            [ "$launch" = 1 ] && start_browser ;;
         coding)
             [ "$prev" != coding ] && say "Coding time" "Compiles get priority. Notifications are paused."
             weights 100 800; dnd true
@@ -79,6 +69,6 @@ case "${1:-auto}" in
         prev=""; [ -f "$state" ] && prev=$(cat "$state")
         [ "$mode" = "$prev" ] && [ "$launch" = 0 ] && exit 0
         apply "$mode" "$launch" ;;
-    learning|coding|free) apply "$1" 1 ;;
-    *) echo "usage: xps-mode learning|coding|free|auto|pick"; exit 1 ;;
+    coding|free) apply "$1" 1 ;;
+    *) echo "usage: xps-mode coding|free|auto|pick"; exit 1 ;;
 esac
