@@ -1,0 +1,16 @@
+# Solid background matching the logo (#04090d), logo centered, gentle fade-in.
+Window.SetBackgroundTopColor(0.0157, 0.0353, 0.0510);
+Window.SetBackgroundBottomColor(0.0157, 0.0353, 0.0510);
+
+logo.image = Image("logo.png");
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetX(Window.GetX() + Window.GetWidth()  / 2 - logo.image.GetWidth()  / 2);
+logo.sprite.SetY(Window.GetY() + Window.GetHeight() / 2 - logo.image.GetHeight() / 2);
+logo.sprite.SetOpacity(0);
+
+fade = 0;
+fun refresh_callback() {
+    if (fade < 1) fade += 0.03;
+    logo.sprite.SetOpacity(fade);
+}
+Plymouth.SetRefreshFunction(refresh_callback);

@@ -1,0 +1,39 @@
+#!/bin/bash
+# Voice typing, fully offline. Press Super+V to start listening, press it again to type what you said
+# into whatever window has focus.
+dir="${XDG_RUNTIME_DIR:-/tmp}/xps-dictate"
+mkdir -p "$dir"
+pidf="$dir/pid"
+wav="$dir/rec.wav"
+model=/usr/share/xps-models/whisper/ggml-base.en.bin
+mydir="${XDG_DATA_HOME:-$HOME/.local/share}/xps-models"
+[ -f "$model" ] || model="$mydir/whisper/ggml-base.en.bin"
+whisper=$(command -v whisper-cli || true)
+[ -n "$whisper" ] || { [ -x "$mydir/whisper-cli" ] && whisper="$mydir/whisper-cli"; }
+
+tell() { command -v notify-send >/dev/null && notify-send -a "Voice typing" -t 3000 "$1" "$2"; return 0; }
+
+if [ ! -f "$model" ] || [ -z "$whisper" ]; then
+    tell "Voice typing is not ready" "The speech files are missing. Connect to the internet and log in again so they can download."
+    exit 1
+fi
+
+if [ -f "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null; then
+    kill -INT "$(cat "$pidf")"
+    rm -f "$pidf"
+    sleep 0.4
+    tell "Typing..." "Turning your speech into text."
+    text=$(nice -n 5 "$whisper" -m "$model" -f "$wav" -nt -np -t 4 2>/dev/null \
+        | tr '\n' ' ' | tr -s ' ' | sed -E 's/\[[^]]*\]//g; s/\([^)]*\)//g; s/^ +//; s/ +$//')
+    rm -f "$wav"
+    if [ -n "$text" ]; then
+        xdotool type --clearmodifiers --delay 8 -- "$text"
+    else
+        tell "Nothing heard" "Check the microphone and try again."
+    fi
+else
+    rm -f "$wav"
+    pw-record --rate 16000 --channels 1 --format s16 "$wav" >/dev/null 2>&1 &
+    echo $! > "$pidf"
+    tell "Listening..." "Press Super+V again when you finish speaking."
+fi

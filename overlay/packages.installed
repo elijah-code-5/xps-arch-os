@@ -104,3 +104,16 @@ libreoffice-fresh
 hunspell-en_us
 xournalpp
 evince
+
+# Voice typing, offline assistant, boot logo, safe graphics
+xorg-server
+xorg-xinit
+xorg-xrdb
+xf86-input-libinput
+plymouth
+xfce4-screensaver
+xdotool
+tk
+curl
+ollama
+mesa-utils

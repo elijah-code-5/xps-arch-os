@@ -2,9 +2,28 @@
 # Runs quietly in the background after the first login: sets up ESP32 support once.
 [ -d /run/archiso ] && exit 0
 done_file="${XDG_STATE_HOME:-$HOME/.local/state}/xps-first-login-done"
+extras_done="${XDG_STATE_HOME:-$HOME/.local/state}/xps-extras-done"
+mkdir -p "$(dirname "$done_file")"
+if [ ! -f "$extras_done" ]; then
+    until nm-online -q -t 30; do sleep 30; done
+    my="${XDG_DATA_HOME:-$HOME/.local/share}/xps-models"
+    mkdir -p "$my/whisper"
+    base=https://github.com/elijah-code-5/xps-arch-os/releases/latest/download
+    nice -n 19 bash -c "
+        [ -x '$my/whisper-cli' ] || { curl -fL --retry 3 -o '$my/whisper-cli.part' $base/whisper-cli && mv '$my/whisper-cli.part' '$my/whisper-cli' && chmod +x '$my/whisper-cli'; }
+        [ -f '$my/whisper/ggml-base.en.bin' ] || { curl -fL --retry 3 -o '$my/whisper/ggml-base.en.bin.part' https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin && mv '$my/whisper/ggml-base.en.bin.part' '$my/whisper/ggml-base.en.bin'; }
+    " && {
+        if command -v ollama >/dev/null; then
+            (OLLAMA_HOST=127.0.0.1:11434 ollama serve >/dev/null 2>&1 & echo $! > /tmp/xps-ollama.pid)
+            sleep 5
+            ollama pull qwen2.5:1.5b && touch "$extras_done"
+            kill "$(cat /tmp/xps-ollama.pid)" 2>/dev/null
+        fi
+    }
+    [ -f "$extras_done" ] && command -v notify-send >/dev/null && notify-send -a "XPS Arch OS" "Voice typing and the AI assistant are ready" "Super+V types what you say. Super+A opens the assistant."
+fi
 [ -f "$done_file" ] && exit 0
 command -v arduino-cli >/dev/null || exit 0
-mkdir -p "$(dirname "$done_file")"
 
 until nm-online -q -t 30; do sleep 30; done
 

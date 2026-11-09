@@ -13,7 +13,7 @@ for g in wheel audio video storage optical network uucp autologin nopasswdlogin;
 done
 
 useradd -m -G "$groups" -s /bin/bash liveuser
-passwd -d liveuser
+echo 'liveuser:live' | chpasswd
 
 echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/99-live
 chmod 440 /etc/sudoers.d/99-live
@@ -27,6 +27,7 @@ EOF
 
 home=/home/liveuser
 mkdir -p "$home/Desktop" "$home/.config/autostart"
+cp -rn /etc/skel/. "$home/" 2>/dev/null || true
 cat > "$home/Desktop/install.desktop" <<EOF
 [Desktop Entry]
 Type=Application
@@ -36,5 +37,4 @@ Icon=system-software-install
 Terminal=true
 EOF
 chmod +x "$home/Desktop/install.desktop"
-cp "$home/Desktop/install.desktop" "$home/.config/autostart/install.desktop"
 chown -R liveuser:liveuser "$home"

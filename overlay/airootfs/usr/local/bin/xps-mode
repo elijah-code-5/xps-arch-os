@@ -3,7 +3,6 @@
 #   xps-mode coding|free            switch now and open that mode's apps
 #   xps-mode auto [--launch]        pick the mode from the clock (a timer runs this every 15 min)
 #   xps-mode pick                   only print the mode the clock says (for testing)
-[ -d /run/archiso ] && exit 0   # not on the live USB
 
 conf="${XDG_CONFIG_HOME:-$HOME/.config}/xps-modes/schedule.conf"
 state="${XDG_STATE_HOME:-$HOME/.local/state}/xps-mode"

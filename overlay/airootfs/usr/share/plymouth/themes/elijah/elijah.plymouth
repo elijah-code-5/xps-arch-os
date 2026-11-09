@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Elijah Laptop
+Description=Elijah Laptop boot logo
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/elijah
+ScriptFile=/usr/share/plymouth/themes/elijah/elijah.script

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Connect my server
+Comment=Link this laptop to your Nextcloud server
+Exec=xps-server-setup
+Icon=network-server
+Categories=Network;

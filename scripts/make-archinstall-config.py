@@ -25,8 +25,13 @@ carry_files = [
     "usr/local/bin/xps-mode",
     "usr/local/bin/xps-mode-settings",
     "usr/local/bin/xps-first-login",
+    "usr/local/bin/xps-dictate",
+    "usr/local/bin/xps-assistant",
+    "usr/local/bin/xps-server-setup",
 ]
 carry_dirs = [
+    "usr/share/plymouth",
+    "etc/plymouth",
     "etc/skel",
     "etc/profile.d",
     "etc/sysctl.d",
@@ -54,7 +59,12 @@ for rel in paths:
     )
 
 commands += [
-    "chmod +x /usr/local/bin/xps-mode /usr/local/bin/xps-mode-settings /usr/local/bin/xps-first-login",
+    "chmod +x /usr/local/bin/xps-mode /usr/local/bin/xps-mode-settings /usr/local/bin/xps-first-login /usr/local/bin/xps-dictate /usr/local/bin/xps-assistant /usr/local/bin/xps-server-setup",
+    # Boot logo: add the plymouth hook, rebuild the boot image, and show the splash (every step is optional)
+    "sed -i 's/^HOOKS=(base udev /HOOKS=(base udev plymouth /' /etc/mkinitcpio.conf || true",
+    "mkinitcpio -P || true",
+    "if [ -f /etc/default/grub ]; then sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash /' /etc/default/grub && grub-mkconfig -o /boot/grub/grub.cfg; fi || true",
+    "for f in /boot/loader/entries/*.conf; do [ -f \"$f\" ] && sed -i '/^options/ s/$/ quiet splash/' \"$f\"; done || true",
     # Home folders already exist when these commands run, so give them the skel files.
     'for d in /home/*/; do u=$(basename "$d"); cp -rn /etc/skel/. "$d" && chown -R "$u":"$(id -gn "$u")" "$d"; done',
     # Coding/free mode timer for every user

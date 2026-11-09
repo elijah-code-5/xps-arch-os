@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Voice typing
+Comment=Press once to listen, again to type (Super+V)
+Exec=xps-dictate
+Icon=audio-input-microphone
+Categories=Utility;

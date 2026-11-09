@@ -44,3 +44,16 @@ Browser memory is capped (soft 6 GB, hard 10 GB) so 24 tabs can never starve you
 First login (once, in the background, needs internet): installs Arduino ESP32 board support
 and `mpremote`. Installed: esptool, thonny, picocom, ssh, and `.local` name lookup so your Pi
 is reachable as `raspberrypi.local`. Serial boards need no extra permissions.
+
+## What is inside the image (works with no internet)
+
+Everything is in the live image, so you can try it in a VM without Wi-Fi: desktop, VS Code, Arduino tools,
+LibreOffice, Shotcut video editor, Nextcloud sync, Firefox, plus:
+
+- **Boot logo:** your Elijah Laptop logo shows while the system starts.
+- **Voice typing (Super+V):** press once to listen, press again and it types what you said, offline.
+- **AI assistant (Super+A):** a small offline chat assistant (model: qwen2.5 1.5B). Nothing leaves the laptop.
+- **Connect my server:** menu entry that links your Nextcloud server (files sync, office opens in the browser).
+- **Locking:** the screen locks when idle and when you close the lid. In the live test session the password is `live`.
+
+Give the VM at least 6 GB of RAM. Install-to-disk still downloads software, so it needs internet.
