@@ -1,82 +1,62 @@
 #!/usr/bin/python3
-"""A safe, informational sign-in setup guide; it never changes PAM or collects credentials."""
-import shutil
+"""Local security center: offers session locking and honest device-security checks."""
+import subprocess
 import tkinter as tk
 from tkinter import ttk
 
-STEPS = [
-    (
-        "1 · Password",
-        "Keep your existing account password enabled as the recovery method.\n\n"
-        "This guide never asks for, reads, or stores your password. Choose a strong, unique password "
-        "and make sure you can sign in before adding other methods.",
-        "Password: use your existing Linux account password. This guide does not change it.",
-    ),
-    (
-        "2 · Passkey / security key",
-        "For Linux desktop login, a passkey needs explicit PAM support. A FIDO2 USB security key "
-        "is the most straightforward local option; a phone or web passkey does not automatically unlock Linux.\n\n"
-        "This machine is not automatically configured just because support tools are present. Before enabling "
-        "PAM authentication, keep a working password login and recovery access. Never replace the only login method.",
-        "Passkey status: support tools not detected. No PAM settings were changed."
-        if not shutil.which("pamu2fcfg")
-        else "Passkey status: pamu2fcfg is installed, but this does not prove a key is enrolled or login is configured.",
-    ),
-    (
-        "3 · Face authentication",
-        "A normal webcam is not equivalent to Face ID and can be spoofed. Reliable face authentication needs "
-        "a compatible depth/infrared sensor and a maintained, trusted Linux authentication module.\n\n"
-        "This guide does not enroll a face or enable webcam-based login. If this laptop lacks compatible IR/depth "
-        "hardware, use your password and a FIDO2 security key instead. Keep password recovery enabled.",
-        "Face authentication status: not configured. Hardware and PAM compatibility have not been verified.",
-    ),
-]
+
+def session_is_encrypted():
+    try:
+        result = subprocess.run(
+            ["lsblk", "-no", "FSTYPE", "/"], check=False, capture_output=True, text=True, timeout=4
+        )
+        return "crypto_LUKS" in result.stdout or "crypt" in result.stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return False
 
 
-class SecurityGuide:
+class SecurityCenter:
     def __init__(self, root):
         self.root = root
-        self.index = 0
-        root.title("XPS device sign-in setup")
-        root.geometry("620x390")
-        root.minsize(520, 340)
+        root.title("XPS Security Center")
+        root.geometry("620x420")
+        root.minsize(520, 360)
 
-        self.title = ttk.Label(root, font=("Sans", 18, "bold"))
-        self.title.pack(anchor="w", padx=20, pady=(20, 10))
-        self.body = ttk.Label(root, wraplength=570, justify="left", font=("Sans", 11))
-        self.body.pack(fill="both", expand=True, anchor="nw", padx=20, pady=8)
-        self.status = ttk.Label(root, wraplength=570, justify="left")
-        self.status.pack(fill="x", padx=20, pady=10)
+        ttk.Label(root, text="Device security", font=("Sans", 18, "bold")).pack(anchor="w", padx=20, pady=(20, 8))
+        ttk.Label(
+            root,
+            text=("This center provides real session locking and practical checks. It does not install fake per-app "
+                  "password prompts or alter PAM. A prompt around an app can be bypassed and is not an access boundary."),
+            wraplength=570, justify="left",
+        ).pack(fill="x", padx=20, pady=8)
 
-        row = ttk.Frame(root)
-        row.pack(fill="x", padx=20, pady=(0, 20))
-        self.back = ttk.Button(row, text="Back", command=self.previous)
-        self.back.pack(side="left")
-        self.next = ttk.Button(row, text="Next", command=self.advance)
-        self.next.pack(side="right")
-        self.render()
+        self.encryption = ttk.Label(root, wraplength=570, justify="left")
+        self.encryption.pack(fill="x", padx=20, pady=8)
+        if session_is_encrypted():
+            self.encryption.configure(text="Storage check: the root filesystem appears to use device encryption. Confirm your home/data volumes too.")
+        else:
+            self.encryption.configure(text="Storage check: could not confirm encryption for /. Check Omarchy's installation settings; full-disk encryption is strongest when enabled during installation.")
 
-    def render(self):
-        title, body, status = STEPS[self.index]
-        self.title.configure(text=title)
-        self.body.configure(text=body)
-        self.status.configure(text=status)
-        self.back.configure(state="normal" if self.index else "disabled")
-        self.next.configure(text="Finish" if self.index == len(STEPS) - 1 else "Next")
+        ttk.Label(
+            root,
+            text=("Recommended: keep a strong account password, enable automatic idle locking in Omarchy settings, "
+                  "and use encrypted storage for private source code and credentials. The AI assistant uses a local "
+                  "Ollama endpoint; do not enter secrets you would not store in a local chat."),
+            wraplength=570, justify="left",
+        ).pack(fill="x", padx=20, pady=8)
+        ttk.Button(root, text="Lock screen now", command=self.lock_screen).pack(anchor="e", padx=20, pady=14)
 
-    def previous(self):
-        self.index = max(0, self.index - 1)
-        self.render()
-
-    def advance(self):
-        if self.index == len(STEPS) - 1:
-            self.root.destroy()
-            return
-        self.index += 1
-        self.render()
+    def lock_screen(self):
+        for command in (["omarchy-lock-screen"], ["loginctl", "lock-session"]):
+            try:
+                subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+            except FileNotFoundError:
+                continue
+        self.encryption.configure(text="Could not find a supported screen-lock command. Use Omarchy's lock-screen shortcut/menu.")
 
 
 if __name__ == "__main__":
-    app = tk.Tk()
-    SecurityGuide(app)
-    app.mainloop()
+    window = tk.Tk()
+    SecurityCenter(window)
+    window.mainloop()

@@ -1,9 +1,10 @@
 #!/usr/bin/python3
-"""Chat with a local Ollama model. Prompts are sent only to localhost, never to Codex or a cloud API."""
+"""Private coding assistant built locally from Qwen2.5-Coder through Ollama."""
 import json
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.request
@@ -12,21 +13,28 @@ try:
     import tkinter as tk
     from tkinter import scrolledtext
 except ImportError:
-    subprocess.run(["notify-send", "AI assistant", "The tk package is missing from this image."])
+    subprocess.run(["notify-send", "XPS Code Assistant", "The tk package is missing from this image."])
     sys.exit(1)
 
-# This must remain a loopback URL: the assistant is local-only and does not call cloud services.
-MODEL = os.environ.get("XPS_MODEL", "qwen2.5:1.5b")
+# This is a local customization of an existing open model, not a foundation model trained from scratch.
+BASE_MODEL = os.environ.get("XPS_BASE_MODEL", "qwen2.5-coder:1.5b")
+MODEL = os.environ.get("XPS_MODEL", "xps-coder")
 HOST = "http://127.0.0.1:11434"
 MODEL_DIR = "/usr/share/xps-models/ollama"
-SYSTEM = ("You are a short, practical assistant for a student who writes code for Arduino and ESP32 boards, "
-          "uses Linux, and runs a Raspberry Pi server. Answer briefly and clearly. If unsure, say so.")
+SYSTEM = (
+    "You are XPS Code Assistant, a coding-only assistant for this user's work: Arduino and ESP32 firmware, "
+    "C/C++, Python, Linux/Arch/Omarchy shell scripts, and Raspberry Pi projects. Stay focused on programming, "
+    "debugging, build errors, hardware interfaces, and safe developer workflows. If a request is unrelated to coding, "
+    "briefly say you are a coding assistant and ask for a programming-related question. Ask for missing board/model "
+    "details rather than guessing. Give concise explanations, compilable examples, and mention risks before destructive "
+    "commands. Never claim code was tested unless it actually was."
+)
 
 
 def server_up():
     try:
-        urllib.request.urlopen(HOST, timeout=1).close()
-        return True
+        with urllib.request.urlopen(HOST, timeout=1):
+            return True
     except Exception:
         return False
 
@@ -42,51 +50,89 @@ def start_server():
                          start_new_session=True)
     except FileNotFoundError:
         return False
-    for _ in range(40):
+    for _ in range(60):
         if server_up():
             return True
         time.sleep(0.5)
     return False
 
 
-def has_model():
-    """Require the selected local model, not merely another model with a similar name."""
+def installed_models():
+    with urllib.request.urlopen(HOST + "/api/tags", timeout=5) as response:
+        data = json.load(response)
+    return {entry.get("name", "") for entry in data.get("models", [])}
+
+
+def model_exists(name, names):
+    return name in names or name + ":latest" in names
+
+
+def ensure_custom_model(report):
+    """Pull a small coding base once, then create the user's local XPS coding persona with Ollama."""
     try:
-        with urllib.request.urlopen(HOST + "/api/tags", timeout=3) as response:
-            data = json.load(response)
-        names = {m.get("name", "") for m in data.get("models", [])}
-        return MODEL in names or MODEL + ":latest" in names
-    except Exception:
+        names = installed_models()
+        if model_exists(MODEL, names):
+            return True
+        if not model_exists(BASE_MODEL, names):
+            report(f"Downloading local coding base {BASE_MODEL} (one-time, around 1 GB)...")
+            result = subprocess.run(["ollama", "pull", BASE_MODEL], text=True, capture_output=True)
+            if result.returncode:
+                report("Model download failed. Check internet and run: ollama pull " + BASE_MODEL)
+                return False
+        report("Creating your local XPS coding model...")
+        model_file = (
+            f"FROM {BASE_MODEL}\n"
+            f'SYSTEM """{SYSTEM}"""\n'
+            "PARAMETER temperature 0.15\n"
+            "PARAMETER num_ctx 4096\n"
+        )
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="xps-coder-", suffix=".Modelfile", delete=False) as handle:
+            handle.write(model_file)
+            path = handle.name
+        try:
+            result = subprocess.run(["ollama", "create", MODEL, "-f", path], text=True, capture_output=True)
+        finally:
+            os.unlink(path)
+        if result.returncode:
+            report("Could not create the local XPS model. " + (result.stderr.strip()[-500:] or "Check Ollama."))
+            return False
+        return True
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        report(f"Could not prepare the local coding model: {exc}")
         return False
 
 
 def chat(messages):
-    body = json.dumps({"model": MODEL, "messages": messages, "stream": False,
-                       "options": {"num_ctx": 4096, "temperature": 0.4}}).encode()
-    req = urllib.request.Request(HOST + "/api/chat", body, {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=300) as response:
+    request_body = json.dumps({
+        "model": MODEL,
+        "messages": messages,
+        "stream": False,
+        "options": {"num_ctx": 4096, "temperature": 0.15},
+    }).encode()
+    request = urllib.request.Request(HOST + "/api/chat", request_body, {"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=300) as response:
         return json.load(response)["message"]["content"].strip()
 
 
 class App:
     def __init__(self, root):
         self.root = root
-        root.title("Local AI assistant · Ollama")
-        root.geometry("720x540")
+        root.title("XPS Code Assistant · local")
+        root.geometry("760x560")
         self.log = scrolledtext.ScrolledText(root, wrap="word", state="disabled", font=("Sans", 11))
         self.log.pack(fill="both", expand=True, padx=8, pady=(8, 4))
-        self.status = tk.Label(root, text=f"Local model: {MODEL} · Requests stay on this computer", anchor="w")
+        self.status = tk.Label(root, text=f"Coding-only · local model {MODEL} · Ollama on this computer", anchor="w")
         self.status.pack(fill="x", padx=10, pady=(0, 4))
         row = tk.Frame(root)
         row.pack(fill="x", padx=8, pady=(0, 8))
         self.entry = tk.Entry(row, font=("Sans", 11))
         self.entry.pack(side="left", fill="x", expand=True)
-        self.entry.bind("<Return>", lambda e: self.send())
+        self.entry.bind("<Return>", lambda event: self.send())
         self.btn = tk.Button(row, text="Send", command=self.send)
         self.btn.pack(side="left", padx=(6, 0))
         self.messages = [{"role": "system", "content": SYSTEM}]
         self.busy = True
-        self.say("Starting the local assistant...\n")
+        self.say("Starting local coding assistant...\n")
         threading.Thread(target=self.boot, daemon=True).start()
 
     def say(self, text):
@@ -95,16 +141,18 @@ class App:
         self.log.configure(state="disabled")
         self.log.see("end")
 
+    def report(self, text):
+        self.root.after(0, lambda text=text: self.say(text + "\n"))
+
     def boot(self):
         if not start_server():
-            self.root.after(0, lambda: self.say("Ollama could not start. Install/start Ollama, then reopen this app.\n"))
+            self.report("Ollama could not start. Install Ollama, then reopen this app.")
             return
-        if not has_model():
-            self.root.after(0, lambda: self.say(
-                f"The local model '{MODEL}' is missing. To download it to this computer, run: ollama pull {MODEL}\n"))
+        self.report("Preparing the custom local coding model. First start may download about 1 GB...")
+        if not ensure_custom_model(self.report):
             return
         self.busy = False
-        self.root.after(0, lambda: (self.say("Ready. This chat uses the local model; it does not use Codex or a cloud service. Ask me anything.\n\n"), self.entry.focus_set()))
+        self.root.after(0, lambda: (self.say("Ready. XPS Code Assistant uses your locally created coding persona on this computer; no cloud/Codex API is used.\n\n"), self.entry.focus_set()))
 
     def send(self):
         text = self.entry.get().strip()
@@ -114,7 +162,6 @@ class App:
         self.busy = True
         self.say(f"You: {text}\n")
         self.messages.append({"role": "user", "content": text})
-        # Keep memory use bounded: system prompt + last 12 messages.
         self.messages = self.messages[:1] + self.messages[1:][-12:]
         threading.Thread(target=self.ask, daemon=True).start()
 
@@ -122,15 +169,15 @@ class App:
         try:
             answer = chat(self.messages)
             self.messages.append({"role": "assistant", "content": answer})
-            self.root.after(0, lambda answer=answer: self.say(f"Assistant: {answer}\n\n"))
+            self.root.after(0, lambda answer=answer: self.say(f"XPS Code Assistant: {answer}\n\n"))
         except Exception as exc:
             message = str(exc)
-            self.root.after(0, lambda message=message: self.say(f"(Something went wrong: {message})\n\n"))
+            self.root.after(0, lambda message=message: self.say(f"(Request failed: {message})\n\n"))
         finally:
             self.busy = False
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    App(root)
-    root.mainloop()
+    app_root = tk.Tk()
+    App(app_root)
+    app_root.mainloop()

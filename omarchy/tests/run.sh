@@ -11,7 +11,9 @@ for f in AppRun install.sh payload/bin/xps-dictate payload/bin/xps-mode payload/
 done
 check python3 -m py_compile payload/bin/xps-assistant
 check python3 -m py_compile payload/bin/xps-security
-
+check grep -q 'qwen2.5-coder:1.5b' payload/bin/xps-assistant
+check grep -q 'MODEL = os.environ.get("XPS_MODEL", "xps-coder")' payload/bin/xps-assistant
+check grep -q '127.0.0.1:11434' payload/bin/xps-assistant
 check python3 -I -c "import json;json.load(open('payload/taskbar/xps-taskbar.jsonc'))"
 
 # Mode schedule: weekday, weekend, and edges
@@ -40,8 +42,7 @@ for style in lua conf; do
     grep -q "keep me" "$H/.config/hypr/bindings.$style" && echo "PASS: $style user lines kept" || { echo "FAIL: $style user line lost"; fail=1; }
 done
 
-# Regression test: the app's folder cannot be read by the administrator account (this broke the first release).
-# A fake "sudo" runs commands as an unprivileged user; the payload is locked to root. Needs root to run.
+# Regression test: the AppImage payload is staged so privileged installation can read it.
 if [ "$(id -u)" = 0 ] && command -v setpriv >/dev/null; then
     chmod 755 "$T"
     mkdir -p "$T/bin" "$T/root" "$T/locked" "$T/hreg/.config/hypr"
