@@ -52,7 +52,7 @@ LibreOffice, Shotcut video editor, Nextcloud sync, Firefox, plus:
 
 - **Boot logo:** your Elijah Laptop logo shows while the system starts.
 - **Voice typing (Super+V):** press once to listen, press again and it types what you said, offline.
-- **AI assistant (Super+A):** a small offline chat assistant (model: qwen2.5 1.5B). Nothing leaves the laptop.
+- **Local AI assistant (Super+A):** runs Qwen 2.5 1.5B with Ollama on this computer. Chat requests go only to `127.0.0.1`; it does not use Codex, an OpenAI API, or another cloud service. The model is downloaded locally during setup (about 1 GB).
 - **Device sign-in guide:** the XPS Setup app adds a three-step guide for password, passkey/security key, and face-authentication considerations.
   It is informational only: it does not change PAM/login settings, enroll a key or face, or collect credentials. Keep password login enabled.
   Face authentication needs compatible IR/depth hardware and a trusted Linux module; a regular webcam is not Face ID.

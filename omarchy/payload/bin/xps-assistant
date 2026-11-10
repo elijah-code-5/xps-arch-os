@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Small offline AI assistant: a chat window on top of a local model (ollama). Nothing leaves the laptop."""
+"""Chat with a local Ollama model. Prompts are sent only to localhost, never to Codex or a cloud API."""
 import json
 import os
 import subprocess
@@ -15,6 +15,7 @@ except ImportError:
     subprocess.run(["notify-send", "AI assistant", "The tk package is missing from this image."])
     sys.exit(1)
 
+# This must remain a loopback URL: the assistant is local-only and does not call cloud services.
 MODEL = os.environ.get("XPS_MODEL", "qwen2.5:1.5b")
 HOST = "http://127.0.0.1:11434"
 MODEL_DIR = "/usr/share/xps-models/ollama"
@@ -49,10 +50,12 @@ def start_server():
 
 
 def has_model():
+    """Require the selected local model, not merely another model with a similar name."""
     try:
         with urllib.request.urlopen(HOST + "/api/tags", timeout=3) as response:
             data = json.load(response)
-        return any(m.get("name", "").startswith(MODEL.split(":")[0]) for m in data.get("models", []))
+        names = {m.get("name", "") for m in data.get("models", [])}
+        return MODEL in names or MODEL + ":latest" in names
     except Exception:
         return False
 
@@ -68,10 +71,12 @@ def chat(messages):
 class App:
     def __init__(self, root):
         self.root = root
-        root.title("AI assistant (offline)")
-        root.geometry("720x520")
+        root.title("Local AI assistant · Ollama")
+        root.geometry("720x540")
         self.log = scrolledtext.ScrolledText(root, wrap="word", state="disabled", font=("Sans", 11))
         self.log.pack(fill="both", expand=True, padx=8, pady=(8, 4))
+        self.status = tk.Label(root, text=f"Local model: {MODEL} · Requests stay on this computer", anchor="w")
+        self.status.pack(fill="x", padx=10, pady=(0, 4))
         row = tk.Frame(root)
         row.pack(fill="x", padx=8, pady=(0, 8))
         self.entry = tk.Entry(row, font=("Sans", 11))
@@ -81,7 +86,7 @@ class App:
         self.btn.pack(side="left", padx=(6, 0))
         self.messages = [{"role": "system", "content": SYSTEM}]
         self.busy = True
-        self.say("Starting the assistant...\n")
+        self.say("Starting the local assistant...\n")
         threading.Thread(target=self.boot, daemon=True).start()
 
     def say(self, text):
@@ -92,14 +97,14 @@ class App:
 
     def boot(self):
         if not start_server():
-            self.root.after(0, lambda: self.say("The assistant engine could not start.\n"))
+            self.root.after(0, lambda: self.say("Ollama could not start. Install/start Ollama, then reopen this app.\n"))
             return
         if not has_model():
             self.root.after(0, lambda: self.say(
-                f"The model '{MODEL}' is not on this system yet. Connect to the internet, then run: ollama pull {MODEL}\n"))
+                f"The local model '{MODEL}' is missing. To download it to this computer, run: ollama pull {MODEL}\n"))
             return
         self.busy = False
-        self.root.after(0, lambda: (self.say("Ready. Ask me anything.\n\n"), self.entry.focus_set()))
+        self.root.after(0, lambda: (self.say("Ready. This chat uses the local model; it does not use Codex or a cloud service. Ask me anything.\n\n"), self.entry.focus_set()))
 
     def send(self):
         text = self.entry.get().strip()
@@ -119,7 +124,6 @@ class App:
             self.messages.append({"role": "assistant", "content": answer})
             self.root.after(0, lambda answer=answer: self.say(f"Assistant: {answer}\n\n"))
         except Exception as exc:
-            # Exception variables are cleared after an except block; bind the value now for the UI callback.
             message = str(exc)
             self.root.after(0, lambda message=message: self.say(f"(Something went wrong: {message})\n\n"))
         finally:
