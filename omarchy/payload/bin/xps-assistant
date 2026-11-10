@@ -11,7 +11,7 @@ import urllib.request
 
 try:
     import tkinter as tk
-    from tkinter import scrolledtext
+    from tkinter import scrolledtext, ttk
 except ImportError:
     subprocess.run(["notify-send", "XPS Code Assistant", "The tk package is missing from this image."])
     sys.exit(1)
@@ -21,14 +21,43 @@ BASE_MODEL = os.environ.get("XPS_BASE_MODEL", "qwen2.5-coder:1.5b")
 MODEL = os.environ.get("XPS_MODEL", "xps-coder")
 HOST = "http://127.0.0.1:11434"
 MODEL_DIR = "/usr/share/xps-models/ollama"
-SYSTEM = (
-    "You are XPS Code Assistant, a coding-only assistant for this user's work: Arduino and ESP32 firmware, "
-    "C/C++, Python, Linux/Arch/Omarchy shell scripts, and Raspberry Pi projects. Stay focused on programming, "
-    "debugging, build errors, hardware interfaces, and safe developer workflows. If a request is unrelated to coding, "
-    "briefly say you are a coding assistant and ask for a programming-related question. Ask for missing board/model "
-    "details rather than guessing. Give concise explanations, compilable examples, and mention risks before destructive "
-    "commands. Never claim code was tested unless it actually was."
+MODES = {
+    "Arduino / ESP32": (
+        "Focus on Arduino and ESP32 firmware, C/C++, GPIO, sensors, serial, PlatformIO/arduino-cli, "
+        "and hardware debugging. Ask for the exact board and compiler/error when needed. Be careful about "
+        "voltage, current, pin limits, and destructive flash/erase operations."
+    ),
+    "Linux sysadmin": (
+        "Focus on Linux, Arch/Omarchy, shell scripting, packages, systemd, permissions, networking, and "
+        "troubleshooting. Prefer reversible diagnostic commands first; clearly warn before destructive or "
+        "privileged operations. Never suggest piping an unverified remote script into a root shell."
+    ),
+    "Raspberry Pi": (
+        "Focus on Raspberry Pi projects, Raspberry Pi OS/Linux, GPIO, Python, SSH, networking, services, "
+        "and connecting Pi projects to microcontrollers. Ask which Pi model and OS if it affects the answer."
+    ),
+    "Code review": (
+        "Review code for correctness, bugs, security, reliability, and maintainability. Lead with concrete "
+        "findings ordered by severity and cite relevant functions/lines when available. Distinguish confirmed "
+        "issues from questions or suggestions; do not invent findings."
+    ),
+    "Build / debug": (
+        "Focus on compiler errors, build systems, test failures, logs, and reproducible debugging. Identify "
+        "the likely root cause, request missing command/toolchain details, and give the smallest safe fix before "
+        "suggesting broad changes."
+    ),
+}
+BASE_SYSTEM = (
+    "You are XPS Code Assistant, a local coding and technical-work assistant for Arduino/ESP32, C/C++, Python, "
+    "Linux/Arch/Omarchy shell scripts, Raspberry Pi, code review, and build/debug work. Stay within the selected "
+    "technical mode. If the user asks for an unrelated topic, briefly say you are a coding assistant and ask for a "
+    "programming or technical question. Ask for missing hardware/tool details instead of guessing. Provide practical "
+    "examples and explain risks before destructive commands. Never claim code was tested unless it actually was."
 )
+
+
+def system_prompt(mode):
+    return BASE_SYSTEM + "\n\nSelected mode: " + mode + ". " + MODES[mode]
 
 
 def server_up():
@@ -68,7 +97,7 @@ def model_exists(name, names):
 
 
 def ensure_custom_model(report):
-    """Pull a small coding base once, then create the user's local XPS coding persona with Ollama."""
+    """Pull a small coding base once, then create the user's local XPS coding model with Ollama."""
     try:
         names = installed_models()
         if model_exists(MODEL, names):
@@ -82,7 +111,9 @@ def ensure_custom_model(report):
         report("Creating your local XPS coding model...")
         model_file = (
             f"FROM {BASE_MODEL}\n"
-            f'SYSTEM """{SYSTEM}"""\n'
+            'SYSTEM """You are XPS Code Assistant, a coding-focused assistant for Arduino/ESP32, C/C++, Python, '
+            "Linux/Arch/Omarchy shell scripts, Raspberry Pi, code review, and debugging. Give safe, concise, "
+            'practical coding help. Ask when important details are missing."""\n'
             "PARAMETER temperature 0.15\n"
             "PARAMETER num_ctx 4096\n"
         )
@@ -118,19 +149,28 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title("XPS Code Assistant · local")
-        root.geometry("760x560")
+        root.geometry("780x590")
         self.log = scrolledtext.ScrolledText(root, wrap="word", state="disabled", font=("Sans", 11))
         self.log.pack(fill="both", expand=True, padx=8, pady=(8, 4))
-        self.status = tk.Label(root, text=f"Coding-only · local model {MODEL} · Ollama on this computer", anchor="w")
-        self.status.pack(fill="x", padx=10, pady=(0, 4))
-        row = tk.Frame(root)
+
+        mode_row = ttk.Frame(root)
+        mode_row.pack(fill="x", padx=10, pady=(2, 6))
+        ttk.Label(mode_row, text="Coding mode:").pack(side="left", padx=(0, 8))
+        self.mode = tk.StringVar(value="Arduino / ESP32")
+        self.mode_picker = ttk.Combobox(mode_row, textvariable=self.mode, values=list(MODES), state="readonly", width=24)
+        self.mode_picker.pack(side="left")
+        self.mode_picker.bind("<<ComboboxSelected>>", self.change_mode)
+        self.status = ttk.Label(mode_row, text=f"Local model: {MODEL} · Ollama on this computer")
+        self.status.pack(side="left", padx=12)
+
+        row = ttk.Frame(root)
         row.pack(fill="x", padx=8, pady=(0, 8))
-        self.entry = tk.Entry(row, font=("Sans", 11))
+        self.entry = ttk.Entry(row, font=("Sans", 11))
         self.entry.pack(side="left", fill="x", expand=True)
         self.entry.bind("<Return>", lambda event: self.send())
-        self.btn = tk.Button(row, text="Send", command=self.send)
+        self.btn = ttk.Button(row, text="Send", command=self.send)
         self.btn.pack(side="left", padx=(6, 0))
-        self.messages = [{"role": "system", "content": SYSTEM}]
+        self.messages = [{"role": "system", "content": system_prompt(self.mode.get())}]
         self.busy = True
         self.say("Starting local coding assistant...\n")
         threading.Thread(target=self.boot, daemon=True).start()
@@ -144,15 +184,20 @@ class App:
     def report(self, text):
         self.root.after(0, lambda text=text: self.say(text + "\n"))
 
+    def change_mode(self, _event=None):
+        selected = self.mode.get()
+        self.messages = [{"role": "system", "content": system_prompt(selected)}]
+        self.say(f"Mode changed to {selected}. Previous chat context was cleared.\n\n")
+
     def boot(self):
         if not start_server():
             self.report("Ollama could not start. Install Ollama, then reopen this app.")
             return
-        self.report("Preparing the custom local coding model. First start may download about 1 GB...")
+        self.report("Preparing the custom local coding model. First start may download around 1 GB...")
         if not ensure_custom_model(self.report):
             return
         self.busy = False
-        self.root.after(0, lambda: (self.say("Ready. XPS Code Assistant uses your locally created coding persona on this computer; no cloud/Codex API is used.\n\n"), self.entry.focus_set()))
+        self.root.after(0, lambda: (self.say("Ready. Choose Arduino/ESP32, Linux sysadmin, Raspberry Pi, code review, or build/debug. This model runs locally; no Codex or cloud API is used.\n\n"), self.entry.focus_set()))
 
     def send(self):
         text = self.entry.get().strip()
@@ -169,7 +214,7 @@ class App:
         try:
             answer = chat(self.messages)
             self.messages.append({"role": "assistant", "content": answer})
-            self.root.after(0, lambda answer=answer: self.say(f"XPS Code Assistant: {answer}\n\n"))
+            self.root.after(0, lambda answer=answer: self.say(f"XPS Code Assistant ({self.mode.get()}): {answer}\n\n"))
         except Exception as exc:
             message = str(exc)
             self.root.after(0, lambda message=message: self.say(f"(Request failed: {message})\n\n"))

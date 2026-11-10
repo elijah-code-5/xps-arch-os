@@ -52,10 +52,8 @@ LibreOffice, Shotcut video editor, Nextcloud sync, Firefox, plus:
 
 - **Boot logo:** your Elijah Laptop logo shows while the system starts.
 - **Voice typing (Super+V):** press once to listen, press again and it types what you said, offline.
-- **Local AI assistant (Super+A):** runs Qwen 2.5 1.5B with Ollama on this computer. Chat requests go only to `127.0.0.1`; it does not use Codex, an OpenAI API, or another cloud service. The model is downloaded locally during setup (about 1 GB).
-- **Device sign-in guide:** the XPS Setup app adds a three-step guide for password, passkey/security key, and face-authentication considerations.
-  It is informational only: it does not change PAM/login settings, enroll a key or face, or collect credentials. Keep password login enabled.
-  Face authentication needs compatible IR/depth hardware and a trusted Linux module; a regular webcam is not Face ID.
+- **Local AI assistant (Super+A):** a customized XPS coding assistant built locally from Qwen2.5-Coder using Ollama. It runs on this computer and sends prompts only to Ollama on `127.0.0.1`; it does not use Codex or a cloud API. Choose one of five modes in the app: **Arduino/ESP32**, **Linux sysadmin**, **Raspberry Pi**, **Code review**, or **Build/debug**. The first run downloads the coding base model (about 1 GB) and creates the local `xps-coder` persona. This is local model customization, not foundation-model training from scratch.
+- **Device security center:** offers an immediate screen-lock button and encryption guidance. It does not claim to enforce per-app authentication or configure PAM for passkeys/face login.
 - **Connect my server:** menu entry that links your Nextcloud server (files sync, office opens in the browser).
 - **Locking:** the screen locks when idle and when you close the lid. In the live test session the password is `live`.
 
@@ -65,7 +63,7 @@ Give the VM at least 6 GB of RAM. Install-to-disk still downloads software, so i
 
 If you run Omarchy instead of the ISO, download **XPS-Setup-x86_64.AppImage** from the newest `setup-*` release,
 allow it to run (right-click, Properties, Permissions, "Allow executing"), and double-click it. It installs the
-task manager, Office, video editor, Nextcloud, Arduino/ESP32 tools, voice typing, the offline assistant and
+task manager, Office, video editor, Nextcloud, Arduino/ESP32 tools, voice typing, the local coding assistant and
 coding/free modes, and adds shortcuts: Super+F7 task manager, F8 control panel, F9 voice typing, F10 assistant.
-The **Device sign-in setup** guide is also available from the app menu. Run it again any time (it skips what is done).
+The **Device Security Center** is available from the app menu. Run setup again to retry skipped steps.
 To remove the shortcuts: run the app with `--undo`.

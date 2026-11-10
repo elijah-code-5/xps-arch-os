@@ -14,6 +14,9 @@ check python3 -m py_compile payload/bin/xps-security
 check grep -q 'qwen2.5-coder:1.5b' payload/bin/xps-assistant
 check grep -q 'MODEL = os.environ.get("XPS_MODEL", "xps-coder")' payload/bin/xps-assistant
 check grep -q '127.0.0.1:11434' payload/bin/xps-assistant
+for mode in 'Arduino / ESP32' 'Linux sysadmin' 'Raspberry Pi' 'Code review' 'Build / debug'; do
+    grep -Fq "$mode" payload/bin/xps-assistant || { echo "FAIL: missing assistant mode: $mode"; fail=1; }
+done
 check python3 -I -c "import json;json.load(open('payload/taskbar/xps-taskbar.jsonc'))"
 
 # Mode schedule: weekday, weekend, and edges

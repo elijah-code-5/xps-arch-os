@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=AI assistant
-Comment=Offline chat assistant (Super+A)
+Name=XPS Code Assistant
+Comment=Local coding help: Arduino/ESP32, Linux, Raspberry Pi, code review and debugging
 Exec=xps-assistant
-Icon=help-browser
-Categories=Utility;
+Icon=applications-development
+Categories=Development;Utility;
