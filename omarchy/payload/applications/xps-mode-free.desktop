@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mode: Free time
+Comment=Everything back to normal
+Exec=xps-mode free
+Icon=applications-games
+Categories=Utility;

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=My shortcuts
+Comment=The keys added by XPS Setup
+Exec=xps-shortcuts
+Icon=input-keyboard
+Categories=Utility;

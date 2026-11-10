@@ -1,0 +1,2 @@
+# Kill the biggest memory hog before the whole desktop freezes.
+EARLYOOM_ARGS="-r 60 -m 5 -s 5"

@@ -1,0 +1,35 @@
+#!/bin/bash
+# Small window to change the mode times (no files to edit by hand).
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/xps-modes/schedule.conf"
+mkdir -p "$(dirname "$conf")"
+
+CODE_START=13:00
+CODE_END=18:00
+WEEKEND=coding
+WEEKEND_START=08:00
+[ -f "$conf" ] && . "$conf"
+
+if [ "$WEEKEND" = free ]; then choices="free!coding"; else choices="coding!free"; fi
+
+out=$(yad --title="XPS Modes: schedule" --center --form --separator='|' \
+    --text="Times use 24-hour HH:MM, for example 08:00 or 13:30." \
+    --field="Coding starts (weekdays)" "$CODE_START" \
+    --field="Coding ends" "$CODE_END" \
+    --field="Coding starts (weekends)" "$WEEKEND_START" \
+    --field="Weekends:CB" "$choices") || exit 0
+
+IFS='|' read -r a b c d _ <<<"$out"
+for t in "$a" "$b" "$c"; do
+    if ! [[ "$t" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; then
+        yad --center --title="XPS Modes" --text="'$t' is not a valid time. Nothing was changed." --button=OK
+        exit 1
+    fi
+done
+
+cat > "$conf" <<EOF
+CODE_START=$a
+CODE_END=$b
+WEEKEND_START=$c
+WEEKEND=$d
+EOF
+xps-mode auto --launch

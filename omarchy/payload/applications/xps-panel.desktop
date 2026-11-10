@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=XPS Control Panel
+Comment=Big buttons for everything: modes, task manager, assistant, server
+Exec=xps-panel
+Icon=preferences-desktop
+Categories=Utility;

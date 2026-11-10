@@ -1,0 +1,6 @@
+[Unit]
+Description=Editor and compiles: memory is protected from reclaim
+
+[Slice]
+MemoryLow=3G
+CPUWeight=100

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mode: Coding
+Comment=VS Code and compiles first, notifications paused
+Exec=xps-mode coding
+Icon=applications-development
+Categories=Utility;

@@ -1,0 +1,21 @@
+#!/bin/bash
+# Plain-language list of the keys this setup added.
+yad --title="Your shortcuts" --center --width=560 --height=420 --button=Close:0 --text-info --wrap <<'EOF'
+ADDED BY XPS SETUP
+  Super + F8     Control panel (big clickable buttons for everything)
+  Super + F7     Task manager
+  Super + F9     Voice typing: press once to listen, again to type
+  Super + F10    AI assistant (works offline)
+
+OMARCHY BASICS
+  Super + Space        Find and open any app (type its name)
+  Super + Alt + Space  Omarchy menu (settings, Wi-Fi, updates)
+  Super + Return       Terminal
+  Super + Q            Close the window
+  Super + K            Show every shortcut
+  Mouse                Top bar icons are clickable. Drag windows with Super + left button.
+
+MODES
+  Coding time 13:00 - 18:00 weekdays (08:00 - 18:00 weekends): editor and builds get priority,
+  notifications are paused. Free time: everything normal. Change times in "Mode times".
+EOF

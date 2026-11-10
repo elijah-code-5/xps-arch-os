@@ -1,0 +1,17 @@
+#!/bin/bash
+# XPS Control Panel: one window with big buttons, so everything can be reached with the mouse.
+exec yad --title="XPS Control Panel" --center --width=520 --borders=14 \
+    --text="<big><b>Elijah Laptop</b></big>\nClick anything. Keyboard: Tab to move, Enter to press." \
+    --form --columns=2 --scroll=false --no-buttons \
+    --field="Task manager!utilities-system-monitor:FBTN" "gnome-system-monitor &" \
+    --field="Terminal activity (btop)!utilities-terminal:FBTN" "xdg-terminal-exec btop &" \
+    --field="Coding mode!applications-development:FBTN" "xps-mode coding &" \
+    --field="Free mode!applications-games:FBTN" "xps-mode free &" \
+    --field="Mode times!preferences-system-time:FBTN" "xps-mode-settings &" \
+    --field="Voice typing (start/stop)!audio-input-microphone:FBTN" "xps-dictate &" \
+    --field="AI assistant!help-browser:FBTN" "xps-assistant &" \
+    --field="Connect my server!network-server:FBTN" "xps-server-setup &" \
+    --field="Video editor!applications-multimedia:FBTN" "kdenlive &" \
+    --field="Office!applications-office:FBTN" "libreoffice &" \
+    --field="Shortcuts list!input-keyboard:FBTN" "xps-shortcuts &" \
+    --field="Lock screen!system-lock-screen:FBTN" "omarchy-lock-screen &"

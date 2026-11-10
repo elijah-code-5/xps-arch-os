@@ -1,0 +1,19 @@
+#!/bin/bash
+# Entry point of the XPS Setup app. Double-click it: it opens a terminal window and does everything.
+HERE="$(dirname "$(readlink -f "$0")")"
+export XPS_PAYLOAD="$HERE/payload"
+
+if [ ! -t 1 ] && [ -z "$XPS_NO_TERMINAL" ]; then
+    self="${APPIMAGE:-$0}"
+    args=("$@")
+    for t in "xdg-terminal-exec" "alacritty -e" "ghostty -e" "kitty" "foot" "konsole -e" "gnome-terminal --" "xterm -e"; do
+        read -ra term <<< "$t"
+        if command -v "${term[0]}" >/dev/null 2>&1; then
+            exec "${term[@]}" "$self" "${args[@]}"
+        fi
+    done
+    command -v notify-send >/dev/null && notify-send "XPS Setup" "No terminal program was found to show progress."
+    exit 1
+fi
+
+exec bash "$HERE/install.sh" "$@"

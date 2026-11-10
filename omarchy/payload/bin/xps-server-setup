@@ -1,0 +1,31 @@
+#!/bin/bash
+# "Connect my server": remembers your Nextcloud address, adds it to the file manager sidebar,
+# and opens the Nextcloud sync app and the online office in your browser.
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/xps-server/server.conf"
+mkdir -p "$(dirname "$conf")"
+SERVER=""
+USERNAME=""
+[ -f "$conf" ] && . "$conf"
+
+out=$(yad --title="Connect my server" --center --form --separator='|' \
+    --text="Your Nextcloud address, for example:  192.168.1.50  or  cloud.example.com\nThe office documents open in your browser from there." \
+    --field="Server address" "$SERVER" \
+    --field="Username" "$USERNAME") || exit 0
+IFS='|' read -r SERVER USERNAME _ <<<"$out"
+SERVER=${SERVER#http://}; SERVER=${SERVER#https://}; SERVER=${SERVER%%/*}
+if [ -z "$SERVER" ] || [ -z "$USERNAME" ]; then
+    yad --center --title="Connect my server" --text="Please fill in both fields." --button=OK
+    exit 1
+fi
+printf 'SERVER=%q\nUSERNAME=%q\n' "$SERVER" "$USERNAME" > "$conf"
+
+# File manager sidebar entry (web folders)
+bm="$HOME/.config/gtk-3.0/bookmarks"
+mkdir -p "$(dirname "$bm")"
+touch "$bm"
+grep -q "My server" "$bm" || echo "davs://$USERNAME@$SERVER/remote.php/dav/files/$USERNAME/ My server" >> "$bm"
+
+# Sync app (it asks for the password itself) and the online office
+command -v nextcloud >/dev/null && (nextcloud >/dev/null 2>&1 &)
+xdg-open "https://$SERVER/" >/dev/null 2>&1 &
+notify-send -a "My server" "Saved" "Opened Nextcloud. Use the sync app to choose which folders stay on this laptop."

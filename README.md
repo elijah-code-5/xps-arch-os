@@ -57,3 +57,11 @@ LibreOffice, Shotcut video editor, Nextcloud sync, Firefox, plus:
 - **Locking:** the screen locks when idle and when you close the lid. In the live test session the password is `live`.
 
 Give the VM at least 6 GB of RAM. Install-to-disk still downloads software, so it needs internet.
+
+## XPS Setup app (for Omarchy)
+
+If you run Omarchy instead of the ISO, download **XPS-Setup-x86_64.AppImage** from the newest `setup-*` release,
+allow it to run (right-click, Properties, Permissions, "Allow executing"), and double-click it. It installs the
+task manager, Office, video editor, Nextcloud, Arduino/ESP32 tools, voice typing, the offline assistant and the
+coding/free modes, and adds shortcuts: Super+F7 task manager, F8 control panel, F9 voice typing, F10 assistant.
+Run it again any time (it skips what is done). To remove the shortcuts: run the app with `--undo`.

@@ -1,0 +1,53 @@
+#!/bin/bash
+# Voice typing, fully offline. Press once to listen, press again to type what you said
+# into whatever window has focus (Wayland: wtype, X11: xdotool).
+dir="${XDG_RUNTIME_DIR:-/tmp}/xps-dictate"
+mkdir -p "$dir"
+pidf="$dir/pid"
+wav="$dir/rec.wav"
+mydir="${XDG_DATA_HOME:-$HOME/.local/share}/xps-models"
+model="$mydir/whisper/ggml-base.en.bin"
+[ -f "$model" ] || model=/usr/share/xps-models/whisper/ggml-base.en.bin
+whisper=$(command -v whisper-cli || true)
+[ -n "$whisper" ] || { [ -x "$mydir/whisper-cli" ] && whisper="$mydir/whisper-cli"; }
+
+tell() { command -v notify-send >/dev/null && notify-send -a "Voice typing" -t 3000 "$1" "$2"; return 0; }
+
+type_text() {
+    if [ -n "$WAYLAND_DISPLAY" ] && command -v wtype >/dev/null; then
+        wtype -- "$1"
+    elif command -v xdotool >/dev/null && [ -n "$DISPLAY" ]; then
+        xdotool type --clearmodifiers --delay 8 -- "$1"
+    elif command -v wl-copy >/dev/null; then
+        printf '%s' "$1" | wl-copy
+        tell "Copied" "Could not type it directly. Paste it with Ctrl+V."
+    else
+        tell "Cannot type here" "Install wtype (Wayland) or xdotool (X11)."
+        return 1
+    fi
+}
+
+if [ ! -f "$model" ] || [ -z "$whisper" ]; then
+    tell "Voice typing is not ready" "The speech files are missing. Run XPS Setup again."
+    exit 1
+fi
+
+if [ -f "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null; then
+    kill -INT "$(cat "$pidf")"
+    rm -f "$pidf"
+    sleep 0.4
+    tell "Typing..." "Turning your speech into text."
+    text=$(nice -n 5 "$whisper" -m "$model" -f "$wav" -nt -np -t 4 2>/dev/null \
+        | tr '\n' ' ' | sed -E 's/\[[^]]*\]//g; s/\([^)]*\)//g' | tr -s ' ' | sed -E 's/^ +//; s/ +$//')
+    rm -f "$wav"
+    if [ -n "$text" ]; then
+        type_text "$text"
+    else
+        tell "Nothing heard" "Check the microphone and try again."
+    fi
+else
+    rm -f "$wav"
+    pw-record --rate 16000 --channels 1 --format s16 "$wav" >/dev/null 2>&1 &
+    echo $! > "$pidf"
+    tell "Listening..." "Press the same keys again when you finish speaking."
+fi

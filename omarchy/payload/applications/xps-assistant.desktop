@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=AI assistant
+Comment=Offline chat assistant (Super+A)
+Exec=xps-assistant
+Icon=help-browser
+Categories=Utility;

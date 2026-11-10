@@ -1,0 +1,67 @@
+name: Build setup app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "omarchy/**"
+      - ".github/workflows/build-setup-app.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the checks
+        run: bash omarchy/tests/run.sh
+
+      - name: Assemble the app
+        run: |
+          set -e
+          mkdir -p AppDir
+          cp -a omarchy/payload AppDir/payload
+          cp omarchy/AppRun omarchy/install.sh AppDir/
+          curl -fL --retry 3 -o AppDir/payload/whisper-cli \
+            https://github.com/elijah-code-5/xps-arch-os/releases/download/iso-7/whisper-cli
+          chmod +x AppDir/AppRun AppDir/install.sh AppDir/payload/bin/* AppDir/payload/whisper-cli
+          cp omarchy/payload/logo.png AppDir/xps-setup.png
+          cp omarchy/payload/logo.png AppDir/.DirIcon
+          cat > AppDir/xps-setup.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=XPS Setup
+          Comment=One-click setup for Elijah Laptop
+          Exec=AppRun
+          Icon=xps-setup
+          Terminal=false
+          Categories=Utility;
+          EOF
+          sed -i 's/^          //' AppDir/xps-setup.desktop
+          curl -fL --retry 3 -o appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir XPS-Setup-x86_64.AppImage
+          cp AppDir/payload/whisper-cli whisper-cli
+          ls -lh XPS-Setup-x86_64.AppImage whisper-cli
+
+      - name: Smoke test the finished app (dry run, changes nothing)
+        run: |
+          mkdir -p "$RUNNER_TEMP/fakehome/.config/hypr"
+          echo "x" > "$RUNNER_TEMP/fakehome/.config/hypr/bindings.lua"
+          HOME="$RUNNER_TEMP/fakehome" XPS_DRY=1 XPS_NO_TERMINAL=1 APPIMAGE_EXTRACT_AND_RUN=1 \
+            ./XPS-Setup-x86_64.AppImage < /dev/null | tail -25
+          grep -q "XPS-SETUP BEGIN" "$RUNNER_TEMP/fakehome/.config/hypr/bindings.lua"
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: setup-${{ github.run_number }}
+          name: XPS Setup app ${{ github.run_number }}
+          files: |
+            XPS-Setup-x86_64.AppImage
+            whisper-cli
