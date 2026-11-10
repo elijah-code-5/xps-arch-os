@@ -15,6 +15,11 @@ OMARCHY BASICS
   Super + K            Show every shortcut
   Mouse                Top bar icons are clickable. Drag windows with Super + left button.
 
+CLOSING THINGS
+  Super + Q      Close the window       Ctrl + W   Close a browser tab
+  Taskbar        Middle-click a window button to close it
+  Ctrl+Shift+T   Bring back the last closed browser tab
+
 MODES
   Coding time 13:00 - 18:00 weekdays (08:00 - 18:00 weekends): editor and builds get priority,
   notifications are paused. Free time: everything normal. Change times in "Mode times".

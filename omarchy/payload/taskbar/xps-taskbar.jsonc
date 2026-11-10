@@ -1,0 +1,32 @@
+{
+  "name": "xps-taskbar",
+  "layer": "top",
+  "position": "bottom",
+  "height": 36,
+  "spacing": 6,
+  "modules-left": ["custom/apps"],
+  "modules-center": ["wlr/taskbar"],
+  "modules-right": ["custom/panel", "clock"],
+  "custom/apps": {
+    "format": "  Apps ",
+    "tooltip": false,
+    "on-click": "bash -c 'if command -v omarchy-launch-walker >/dev/null; then omarchy-launch-walker; else walker; fi'"
+  },
+  "wlr/taskbar": {
+    "format": "{icon} {title:.22}",
+    "icon-size": 20,
+    "all-outputs": true,
+    "tooltip-format": "{title}\nClick: open   Middle-click: close",
+    "on-click": "activate",
+    "on-click-middle": "close"
+  },
+  "custom/panel": {
+    "format": " Panel ",
+    "tooltip": false,
+    "on-click": "xps-panel"
+  },
+  "clock": {
+    "format": "{:%H:%M}",
+    "tooltip-format": "{:%A, %d %B %Y}"
+  }
+}

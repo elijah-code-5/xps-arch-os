@@ -1,0 +1,7 @@
+* { font-family: "JetBrainsMono Nerd Font", "Noto Sans", sans-serif; font-size: 13px; border: none; border-radius: 0; }
+window#waybar { background: #04090d; color: #9cfbfb; border-top: 1px solid #1f5e66; }
+#custom-apps, #custom-panel, #clock { padding: 0 12px; margin: 4px 2px; border-radius: 6px; background: #0b1a20; }
+#custom-apps:hover, #custom-panel:hover { background: #1f5e66; }
+#taskbar button { padding: 0 10px; margin: 4px 2px; border-radius: 6px; background: #0b1a20; color: #9cfbfb; }
+#taskbar button:hover { background: #17434a; }
+#taskbar button.active { background: #1f5e66; border-bottom: 2px solid #9cfbfb; }

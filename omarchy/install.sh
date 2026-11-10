@@ -35,8 +35,9 @@ undo() {
     for f in "$HYPR/bindings.lua" "$HYPR/bindings.conf"; do strip_block "$f" && [ -f "$f" ] && ok "Shortcuts removed from $(basename "$f")"; done
     rm -f "$APPS"/xps-*.desktop
     systemctl --user disable --now xps-mode-auto.timer >/dev/null 2>&1
-    rm -f "$HOME/.config/systemd/user"/xps-*
-    ok "Menu entries and the mode timer removed"
+    systemctl --user disable --now xps-taskbar.service >/dev/null 2>&1
+    rm -f "$HOME/.config/systemd/user"/xps-* "$HOME/.config/waybar"/xps-taskbar.*
+    ok "Menu entries, taskbar and the mode timer removed"
     pause_end
     exit 0
 }
@@ -51,7 +52,7 @@ cat <<'EOF'
   This will, by itself:
     - update the system and install: Office, video editor, task manager, Nextcloud, Arduino/ESP32 tools
     - add voice typing, the offline AI assistant, coding/free time modes, the control panel
-    - add shortcuts: Super+F7 task manager, F8 panel, F9 voice typing, F10 assistant
+    - add a taskbar at the bottom of the screen and shortcuts: Super+F7 task manager, F8 panel, F9 voice typing, F10 assistant
   It asks for your password once. It can take 10-30 minutes depending on your internet.
 EOF
 if [ "$DRY" != 1 ]; then read -r -t 15 -p "  Starting in 15 seconds. Press Enter to start now, or close this window to cancel. " _ ; echo; fi
@@ -98,7 +99,7 @@ fi
 
 PKGS=(
     # task manager, voice typing, dialogs
-    gnome-system-monitor btop wtype yad tk libnotify wl-clipboard pipewire
+    gnome-system-monitor btop wtype yad tk libnotify wl-clipboard pipewire waybar
     # office, video editor, server sync
     libreoffice-fresh hunspell-en_us kdenlive nextcloud-client xournalpp
     # offline assistant
@@ -166,6 +167,27 @@ if [ "$DRY" != 1 ]; then
     xps-mode auto >/dev/null 2>&1
 fi
 ok "Menu entries added (press Super+Space and type: XPS, Task, Assistant, Voice...)"
+
+# --- 6b. taskbar -----------------------------------------------------------------------------------------
+say "Adding the taskbar (bottom of the screen, lists open windows)"
+mkdir -p "$HOME/.config/waybar"
+cp -f "$PAYLOAD/taskbar/xps-taskbar.jsonc" "$PAYLOAD/taskbar/xps-taskbar.css" "$HOME/.config/waybar/"
+cp -f "$PAYLOAD/taskbar/xps-taskbar.service" "$HOME/.config/systemd/user/"
+if [ "$DRY" != 1 ]; then
+    systemctl --user daemon-reload
+    systemctl --user enable xps-taskbar.service >/dev/null 2>&1
+    systemctl --user restart xps-taskbar.service >/dev/null 2>&1
+    sleep 2
+    if systemctl --user is-active --quiet xps-taskbar.service; then ok "Taskbar added at the bottom of the screen";
+    else
+        # fall back to starting it directly for this session
+        ( setsid waybar -c "$HOME/.config/waybar/xps-taskbar.jsonc" -s "$HOME/.config/waybar/xps-taskbar.css" >/dev/null 2>&1 & )
+        sleep 2
+        pgrep -f xps-taskbar.jsonc >/dev/null && ok "Taskbar started (it will also start at next login)" || bad "Taskbar did not start. It is in the Waybar settings if you want it later."
+    fi
+else
+    ok "Taskbar files installed"
+fi
 
 # --- 7. shortcuts (works for both Omarchy config styles) ------------------------------------------------
 say "Adding keyboard shortcuts"

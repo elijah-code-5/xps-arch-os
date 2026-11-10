@@ -1,0 +1,13 @@
+[Unit]
+Description=XPS taskbar (bottom bar listing open windows)
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Service]
+ExecStart=/usr/bin/waybar -c %h/.config/waybar/xps-taskbar.jsonc -s %h/.config/waybar/xps-taskbar.css
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
