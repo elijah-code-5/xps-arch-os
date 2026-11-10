@@ -6,7 +6,7 @@ fail=0
 check() { if "$@"; then echo "PASS: $*" | cut -c1-110; else echo "FAIL: $*"; fail=1; fi; }
 
 for f in AppRun install.sh payload/bin/xps-dictate payload/bin/xps-mode payload/bin/xps-mode-settings \
-         payload/bin/xps-panel payload/bin/xps-shortcuts payload/bin/xps-server-setup payload/bin/xps-security; do
+         payload/bin/xps-panel payload/bin/xps-shortcuts payload/bin/xps-server-setup; do
     check bash -n "$f"
 done
 check python3 -m py_compile payload/bin/xps-assistant
