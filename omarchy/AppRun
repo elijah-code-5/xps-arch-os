@@ -2,6 +2,9 @@
 # Entry point of the XPS Setup app. Double-click it: it opens a terminal window and does everything.
 HERE="$(dirname "$(readlink -f "$0")")"
 export XPS_PAYLOAD="$HERE/payload"
+# AppImage runtime sets TMPDIR to its FUSE mount. Root cannot read that mount,
+# so the installer must stage its payload somewhere accessible to sudo.
+export TMPDIR="${XPS_STAGE_DIR:-/var/tmp}"
 
 if [ ! -t 1 ] && [ -z "$XPS_NO_TERMINAL" ]; then
     self="${APPIMAGE:-$0}"
