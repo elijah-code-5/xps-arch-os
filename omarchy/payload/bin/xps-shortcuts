@@ -2,6 +2,7 @@
 # Plain-language list of the keys this setup added.
 yad --title="Your shortcuts" --center --width=560 --height=420 --button=Close:0 --text-info --wrap <<'EOF'
 ADDED BY XPS SETUP
+  (If the F-keys do nothing on your Dell: press Fn+Esc once, or hold Fn.)
   Super + F8     Control panel (big clickable buttons for everything)
   Super + F7     Task manager
   Super + F9     Voice typing: press once to listen, again to type

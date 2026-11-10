@@ -38,5 +38,27 @@ for style in lua conf; do
     [ ! -f "$H/.config/waybar/xps-taskbar.jsonc" ] && echo "PASS: $style undo removed taskbar" || { echo "FAIL: $style undo left taskbar"; fail=1; }
     grep -q "keep me" "$H/.config/hypr/bindings.$style" && echo "PASS: $style user lines kept" || { echo "FAIL: $style user line lost"; fail=1; }
 done
+
+# Regression test: the app's folder cannot be read by the administrator account (this broke the first release).
+# A fake "sudo" runs commands as an unprivileged user; the payload is locked to root. Needs root to run.
+if [ "$(id -u)" = 0 ] && command -v setpriv >/dev/null; then
+    chmod 755 "$T"
+    mkdir -p "$T/bin" "$T/root" "$T/locked" "$T/hreg/.config/hypr"
+    chmod 777 "$T/root"
+    cp -a payload "$T/locked/payload"; chmod -R go-rwx "$T/locked"
+    printf '#!/bin/bash\nexec setpriv --reuid=65534 --regid=65534 --clear-groups "$@"\n' > "$T/bin/sudo"; chmod +x "$T/bin/sudo"
+    echo "x" > "$T/hreg/.config/hypr/bindings.lua"
+    PATH="$T/bin:$PATH" HOME="$T/hreg" XPS_DRY=1 XPS_TEST_REAL_INSTALL=1 XPS_ROOT="$T/root" \
+        XPS_PAYLOAD="$T/locked/payload" bash install.sh </dev/null >"$T/reg.log" 2>&1
+    for f in xps-dictate xps-assistant xps-mode xps-panel xps-shortcuts xps-server-setup xps-mode-settings whisper-cli; do
+        if [ "$f" = whisper-cli ]; then [ -e payload/whisper-cli ] || continue; fi
+        [ -x "$T/root/usr/local/bin/$f" ] && echo "PASS: locked payload -> $f installed" || { echo "FAIL: $f not installed from a locked payload"; fail=1; }
+    done
+    [ -f "$T/root/etc/default/earlyoom" ] && echo "PASS: locked payload -> earlyoom config installed" || { echo "FAIL: earlyoom config missing"; fail=1; }
+    grep -q "Permission denied" "$T/reg.log" && { echo "FAIL: permission errors in installer output"; fail=1; } || echo "PASS: no permission errors"
+else
+    echo "SKIP: locked-payload regression test (needs root)"
+fi
+
 rm -rf "$T"
 exit $fail

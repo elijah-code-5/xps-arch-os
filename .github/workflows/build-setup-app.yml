@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run the checks
-        run: bash omarchy/tests/run.sh
+        run: sudo env PYTHONDONTWRITEBYTECODE=1 bash omarchy/tests/run.sh
 
       - name: Assemble the app
         run: |
@@ -28,6 +28,7 @@ jobs:
           cp omarchy/AppRun omarchy/install.sh AppDir/
           curl -fL --retry 3 -o AppDir/payload/whisper-cli \
             https://github.com/elijah-code-5/xps-arch-os/releases/download/iso-7/whisper-cli
+          find AppDir -name '__pycache__' -prune -exec rm -rf {} +
           chmod +x AppDir/AppRun AppDir/install.sh AppDir/payload/bin/* AppDir/payload/whisper-cli
           cp omarchy/payload/logo.png AppDir/xps-setup.png
           cp omarchy/payload/logo.png AppDir/.DirIcon

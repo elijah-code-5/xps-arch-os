@@ -3,18 +3,31 @@
 #   (no arguments)  install everything
 #   --undo          remove the shortcuts, menu entries and mode timer this app added
 # Set XPS_DRY=1 to print the system-level steps instead of running them (used by the tests).
-PAYLOAD="${XPS_PAYLOAD:?XPS_PAYLOAD is not set}"
+SRC="${XPS_PAYLOAD:?XPS_PAYLOAD is not set}"
 DRY="${XPS_DRY:-0}"
+R="${XPS_ROOT:-}"     # empty on a real system; the tests point it at a scratch folder
 LOG="$HOME/.local/state/xps-setup.log"
 mkdir -p "$(dirname "$LOG")"
 exec > >(tee -a "$LOG") 2>&1
+
+# The app's own files sit in a mount that even the administrator account cannot read.
+# Copy them somewhere ordinary first, otherwise every "sudo install" from them fails.
+STAGE=$(mktemp -d "${TMPDIR:-/tmp}/xps-stage.XXXXXX")
+cp -a "$SRC/." "$STAGE/"
+find "$STAGE" -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null
+chmod -R a+rX "$STAGE"
+PAYLOAD="$STAGE"
+trap 'rm -rf "$STAGE"' EXIT
 
 DONE=(); FAILED=(); NOTES=()
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 ok()   { printf '  \033[32m[ok]\033[0m %s\n' "$*"; DONE+=("$*"); }
 bad()  { printf '  \033[31m[problem]\033[0m %s\n' "$*"; FAILED+=("$*"); }
 note() { printf '  %s\n' "$*"; }
-run()  { if [ "$DRY" = 1 ]; then echo "  [dry-run] $*"; return 0; fi; "$@"; }
+run()  {
+    if [ "$DRY" = 1 ] && ! { [ "${XPS_TEST_REAL_INSTALL:-0}" = 1 ] && [ "${2:-}" = install ]; }; then echo "  [dry-run] $*"; return 0; fi
+    "$@"
+}
 pause_end() { [ "$DRY" = 1 ] && return; echo; read -r -p "Press Enter to close this window. "; }
 
 BEGIN_MARK='XPS-SETUP BEGIN'
@@ -135,25 +148,32 @@ if [ "$DRY" = 1 ] || [ "$UPDATED" = 1 ]; then
     if [ -d /sys/block/zram0 ] || { command -v swapon >/dev/null && swapon --show=NAME --noheadings 2>/dev/null | grep -q zram; }; then
         note "Compressed swap (zram) is already on. Leaving it as it is."
     else
-        run sudo install -Dm644 "$PAYLOAD/system/zram-generator.conf" /etc/systemd/zram-generator.conf
-        run sudo install -Dm644 "$PAYLOAD/system/99-xps-memory.conf" /etc/sysctl.d/99-xps-memory.conf
-        run sudo systemctl daemon-reload
-        run sudo systemctl start systemd-zram-setup@zram0.service
-        run sudo sysctl --system
-        ok "Compressed swap enabled"
+        if run sudo install -Dm644 "$PAYLOAD/system/zram-generator.conf" "$R/etc/systemd/zram-generator.conf" \
+           && run sudo install -Dm644 "$PAYLOAD/system/99-xps-memory.conf" "$R/etc/sysctl.d/99-xps-memory.conf" \
+           && run sudo systemctl daemon-reload && run sudo systemctl start systemd-zram-setup@zram0.service && run sudo sysctl --system >/dev/null; then
+            ok "Compressed swap enabled"
+        else bad "Compressed swap did not turn on"; fi
     fi
-    run sudo install -Dm644 "$PAYLOAD/system/earlyoom" /etc/default/earlyoom
-    if run sudo systemctl enable --now earlyoom.service; then ok "Out-of-memory guard on (one runaway program can no longer freeze the laptop)"; else bad "earlyoom did not start"; fi
-    run sudo install -Dm644 "$PAYLOAD/system/50-serial-uaccess.rules" /etc/udev/rules.d/50-serial-uaccess.rules
-    run sudo udevadm control --reload-rules
-    run sudo usermod -aG uucp "$USER" && ok "Arduino and ESP32 boards can be used without extra permissions (after a restart)"
+    if run sudo install -Dm644 "$PAYLOAD/system/earlyoom" "$R/etc/default/earlyoom" && run sudo systemctl enable --now earlyoom.service; then
+        ok "Out-of-memory guard on (one runaway program can no longer freeze the laptop)"
+    else bad "The out-of-memory guard did not install"; fi
+    if run sudo install -Dm644 "$PAYLOAD/system/50-serial-uaccess.rules" "$R/etc/udev/rules.d/50-serial-uaccess.rules" \
+       && run sudo udevadm control --reload-rules && run sudo usermod -aG uucp "$USER"; then
+        ok "Arduino and ESP32 boards can be used without extra permissions (after a restart)"
+    else bad "Arduino board permissions did not install"; fi
 fi
 
 # --- 6. my tools ----------------------------------------------------------------------------------------
 say "Installing my tools"
-for f in "$PAYLOAD"/bin/*; do run sudo install -Dm755 "$f" "/usr/local/bin/$(basename "$f")"; done
-[ -x "$PAYLOAD/whisper-cli" ] && run sudo install -Dm755 "$PAYLOAD/whisper-cli" /usr/local/bin/whisper-cli
-ok "Voice typing, assistant, modes, control panel and shortcuts list installed"
+TOOLFAIL=0
+for f in "$PAYLOAD"/bin/*; do
+    [ -f "$f" ] || continue
+    run sudo install -Dm755 "$f" "$R/usr/local/bin/$(basename "$f")" || { bad "Could not install $(basename "$f")"; TOOLFAIL=1; }
+done
+if [ -f "$PAYLOAD/whisper-cli" ]; then
+    run sudo install -Dm755 "$PAYLOAD/whisper-cli" "$R/usr/local/bin/whisper-cli" || { bad "Could not install the speech engine"; TOOLFAIL=1; }
+fi
+[ "$TOOLFAIL" = 0 ] && ok "Voice typing, assistant, modes, control panel and shortcuts list installed"
 
 mkdir -p "$APPS" "$HOME/.config/systemd/user" "$HOME/.config/xps-modes" "$HOME/.local/share/xps-models/whisper"
 cp -f "$PAYLOAD"/applications/*.desktop "$APPS/"
@@ -164,7 +184,7 @@ command -v update-desktop-database >/dev/null && update-desktop-database "$APPS"
 if [ "$DRY" != 1 ]; then
     systemctl --user daemon-reload
     systemctl --user enable --now xps-mode-auto.timer >/dev/null 2>&1 && ok "Coding/free time modes switch by the clock (13:00-18:00 weekdays, 08:00-18:00 weekends)" || bad "Mode timer did not start"
-    xps-mode auto >/dev/null 2>&1
+    command -v xps-mode >/dev/null 2>&1 && xps-mode auto >/dev/null 2>&1
 fi
 ok "Menu entries added (press Super+Space and type: XPS, Task, Assistant, Voice...)"
 
@@ -249,6 +269,18 @@ elif command -v arduino-cli >/dev/null 2>&1; then
     command -v pipx >/dev/null && pipx install mpremote >/dev/null 2>&1 && ok "mpremote (MicroPython tool) installed"
 fi
 
+# --- self-check: prove it works, do not just trust the steps above -----------------------------------------------
+say "Checking that everything really works"
+if [ "$DRY" != 1 ]; then
+    for c in gnome-system-monitor kdenlive libreoffice nextcloud ollama wtype yad arduino-cli xps-mode xps-dictate xps-assistant xps-panel xps-shortcuts xps-server-setup whisper-cli; do
+        command -v "$c" >/dev/null 2>&1 || bad "'$c' is not installed or not found"
+    done
+    /usr/bin/python3 -c "import tkinter" >/dev/null 2>&1 || bad "The assistant window needs Python's tk, which is missing"
+    [ -f "$HOME/.local/share/xps-models/whisper/ggml-base.en.bin" ] || bad "The speech model is missing"
+    ollama list 2>/dev/null | grep -q qwen2.5 || { [ -d "$HOME/.ollama/models" ] && ls "$HOME/.ollama/models/manifests" >/dev/null 2>&1; } || bad "The assistant model is missing"
+    [ ${#FAILED[@]} -eq 0 ] && ok "All checks passed"
+fi
+
 # --- done ------------------------------------------------------------------------------------------------------
 [ -n "${KEEPALIVE:-}" ] && kill "$KEEPALIVE" 2>/dev/null
 echo
@@ -266,6 +298,8 @@ cat <<'EOF'
     1. Restart the laptop once (so Arduino board access applies).
     2. Press Super+F8 for the control panel, or Super+Space and type what you want.
     3. Super+F7 = task manager. Super+F9 = voice typing. Super+F10 = AI assistant.
+       If those F-keys do nothing on your Dell: press Fn+Esc once (switches the function row), or hold Fn.
+       Always works: Super+Space, then type "Task Manager" / "Assistant" / "XPS".
   Still to come: the three-step login (password + USB stick + 4-digit code). It is not installed yet.
   A full log is in: ~/.local/state/xps-setup.log
 EOF
