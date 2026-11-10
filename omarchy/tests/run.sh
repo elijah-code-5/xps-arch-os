@@ -6,10 +6,11 @@ fail=0
 check() { if "$@"; then echo "PASS: $*" | cut -c1-110; else echo "FAIL: $*"; fail=1; fi; }
 
 for f in AppRun install.sh payload/bin/xps-dictate payload/bin/xps-mode payload/bin/xps-mode-settings \
-         payload/bin/xps-panel payload/bin/xps-shortcuts payload/bin/xps-server-setup; do
+         payload/bin/xps-panel payload/bin/xps-shortcuts payload/bin/xps-server-setup payload/bin/xps-security; do
     check bash -n "$f"
 done
 check python3 -m py_compile payload/bin/xps-assistant
+check python3 -m py_compile payload/bin/xps-security
 
 check python3 -I -c "import json;json.load(open('payload/taskbar/xps-taskbar.jsonc'))"
 
@@ -50,7 +51,7 @@ if [ "$(id -u)" = 0 ] && command -v setpriv >/dev/null; then
     echo "x" > "$T/hreg/.config/hypr/bindings.lua"
     PATH="$T/bin:$PATH" HOME="$T/hreg" XPS_DRY=1 XPS_TEST_REAL_INSTALL=1 XPS_ROOT="$T/root" \
         XPS_PAYLOAD="$T/locked/payload" bash install.sh </dev/null >"$T/reg.log" 2>&1
-    for f in xps-dictate xps-assistant xps-mode xps-panel xps-shortcuts xps-server-setup xps-mode-settings whisper-cli; do
+    for f in xps-dictate xps-assistant xps-mode xps-panel xps-shortcuts xps-server-setup xps-mode-settings xps-security whisper-cli; do
         if [ "$f" = whisper-cli ]; then [ -e payload/whisper-cli ] || continue; fi
         [ -x "$T/root/usr/local/bin/$f" ] && echo "PASS: locked payload -> $f installed" || { echo "FAIL: $f not installed from a locked payload"; fail=1; }
     done

@@ -16,8 +16,8 @@ coding (VS Code, Arduino), online lessons, lots of browser tabs and music.
 
 1. Open the repo's **Releases** (right side of the main page) and download the newest `.iso`.
    (Builds run in **Actions** and publish there automatically.)
-3. Test it in a VM (VirtualBox or virt-manager, enable EFI, 4 GB RAM, 30 GB disk).
-4. To put it on a USB stick use Balena Etcher.
+2. Test it in a VM (VirtualBox or virt-manager, enable EFI, 6 GB RAM, 30 GB disk).
+3. To put it on a USB stick use Balena Etcher.
 
 The live system boots to a small desktop and opens the installer by itself (or double-click
 **Install XPS Arch OS**). It needs internet: connect Wi-Fi with the network icon first. The installer
@@ -53,6 +53,9 @@ LibreOffice, Shotcut video editor, Nextcloud sync, Firefox, plus:
 - **Boot logo:** your Elijah Laptop logo shows while the system starts.
 - **Voice typing (Super+V):** press once to listen, press again and it types what you said, offline.
 - **AI assistant (Super+A):** a small offline chat assistant (model: qwen2.5 1.5B). Nothing leaves the laptop.
+- **Device sign-in guide:** the XPS Setup app adds a three-step guide for password, passkey/security key, and face-authentication considerations.
+  It is informational only: it does not change PAM/login settings, enroll a key or face, or collect credentials. Keep password login enabled.
+  Face authentication needs compatible IR/depth hardware and a trusted Linux module; a regular webcam is not Face ID.
 - **Connect my server:** menu entry that links your Nextcloud server (files sync, office opens in the browser).
 - **Locking:** the screen locks when idle and when you close the lid. In the live test session the password is `live`.
 
@@ -62,6 +65,7 @@ Give the VM at least 6 GB of RAM. Install-to-disk still downloads software, so i
 
 If you run Omarchy instead of the ISO, download **XPS-Setup-x86_64.AppImage** from the newest `setup-*` release,
 allow it to run (right-click, Properties, Permissions, "Allow executing"), and double-click it. It installs the
-task manager, Office, video editor, Nextcloud, Arduino/ESP32 tools, voice typing, the offline assistant and the
+task manager, Office, video editor, Nextcloud, Arduino/ESP32 tools, voice typing, the offline assistant and
 coding/free modes, and adds shortcuts: Super+F7 task manager, F8 control panel, F9 voice typing, F10 assistant.
-Run it again any time (it skips what is done). To remove the shortcuts: run the app with `--undo`.
+The **Device sign-in setup** guide is also available from the app menu. Run it again any time (it skips what is done).
+To remove the shortcuts: run the app with `--undo`.

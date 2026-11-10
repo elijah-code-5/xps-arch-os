@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Device sign-in setup
+Comment=Review password, passkey and face-authentication options safely
+Exec=xps-security
+Icon=system-lock-screen
+Categories=Settings;Security;

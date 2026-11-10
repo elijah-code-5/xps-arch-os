@@ -24,7 +24,7 @@ SYSTEM = ("You are a short, practical assistant for a student who writes code fo
 
 def server_up():
     try:
-        urllib.request.urlopen(HOST, timeout=1)
+        urllib.request.urlopen(HOST, timeout=1).close()
         return True
     except Exception:
         return False
@@ -50,7 +50,8 @@ def start_server():
 
 def has_model():
     try:
-        data = json.load(urllib.request.urlopen(HOST + "/api/tags", timeout=3))
+        with urllib.request.urlopen(HOST + "/api/tags", timeout=3) as response:
+            data = json.load(response)
         return any(m.get("name", "").startswith(MODEL.split(":")[0]) for m in data.get("models", []))
     except Exception:
         return False
@@ -60,8 +61,8 @@ def chat(messages):
     body = json.dumps({"model": MODEL, "messages": messages, "stream": False,
                        "options": {"num_ctx": 4096, "temperature": 0.4}}).encode()
     req = urllib.request.Request(HOST + "/api/chat", body, {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=300) as r:
-        return json.load(r)["message"]["content"].strip()
+    with urllib.request.urlopen(req, timeout=300) as response:
+        return json.load(response)["message"]["content"].strip()
 
 
 class App:
@@ -108,7 +109,7 @@ class App:
         self.busy = True
         self.say(f"You: {text}\n")
         self.messages.append({"role": "user", "content": text})
-        # keep memory use bounded: system prompt + last 12 messages
+        # Keep memory use bounded: system prompt + last 12 messages.
         self.messages = self.messages[:1] + self.messages[1:][-12:]
         threading.Thread(target=self.ask, daemon=True).start()
 
@@ -116,9 +117,11 @@ class App:
         try:
             answer = chat(self.messages)
             self.messages.append({"role": "assistant", "content": answer})
-            self.root.after(0, lambda: self.say(f"Assistant: {answer}\n\n"))
+            self.root.after(0, lambda answer=answer: self.say(f"Assistant: {answer}\n\n"))
         except Exception as exc:
-            self.root.after(0, lambda: self.say(f"(Something went wrong: {exc})\n\n"))
+            # Exception variables are cleared after an except block; bind the value now for the UI callback.
+            message = str(exc)
+            self.root.after(0, lambda message=message: self.say(f"(Something went wrong: {message})\n\n"))
         finally:
             self.busy = False
 
