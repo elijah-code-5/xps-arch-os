@@ -1,25 +1,43 @@
 #!/usr/bin/env bash
-# xps-security: the lock screen asks for your password AND your USB key.
-# Lost the key? It asks for your recovery code instead. Everything is tested before it is switched on.
-#   xps-security enroll    set up (or change) the USB key and the code
-#   xps-security status    show what is set up
-#   xps-security test      try a lock-screen login without locking anything
-#   xps-security disable   switch it off and restore the original lock screen
+# xps-security: add a USB-storage presence check to Omarchy's lock PAM service.
+# Keep the normal password as the primary factor and the recovery code as fallback.
+#   xps-security enroll    set up (or change) the USB key and recovery code
+#   xps-security status    show configured state
+#   xps-security test      test the PAM service without locking the session
+#   xps-security disable   restore the original lock PAM file
+set -u
 SRC=/usr/local/share/xps-security/src
-CONF=/etc/xps-security/xps.conf
-PAMFILE=/etc/pam.d/hyprlock
-BACKUP=/etc/pam.d/hyprlock.before-xps
-MOD=/usr/lib/security/pam_xps.so
+CONF=${XPS_CONF:-/etc/xps-security/xps.conf}
+PAM_DIR=${XPS_PAM_DIR:-/etc/pam.d}
+MOD=${XPS_PAM_MODULE:-/usr/lib/security/pam_xps.so}
+
+# Omarchy calls its lock-screen PAM service omarchy-lock-password. Older/custom
+# Hyprlock setups may instead provide a dedicated hyprlock service. Only touch a
+# PAM stack that already exists; never create a guessed service file.
+if [ -f "$PAM_DIR/omarchy-lock-password" ]; then
+    PAMFILE="$PAM_DIR/omarchy-lock-password"
+elif [ -f "$PAM_DIR/hyprlock" ]; then
+    PAMFILE="$PAM_DIR/hyprlock"
+else
+    PAMFILE=""
+fi
+if [ -n "$PAMFILE" ]; then
+    PAM_SERVICE=${PAMFILE##*/}
+    BACKUP="$PAMFILE.before-xps"
+else
+    PAM_SERVICE=""
+    BACKUP=""
+fi
 
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 ok()   { printf '  \033[32m[ok]\033[0m %s\n' "$*"; }
 die()  { printf '  \033[31m[stopped]\033[0m %s\n' "$*"; echo "  Nothing was switched on. Your lock screen is unchanged."; [ -t 0 ] && read -r -p "  Press Enter to close. " _; exit 1; }
 rescue() {
-    cat <<'EOT'
+    cat <<EOT
 
   IF YOU EVER CANNOT UNLOCK:
-    1. Press Ctrl+Alt+F3, log in with your normal password.
-    2. Run:  sudo cp /etc/pam.d/hyprlock.before-xps /etc/pam.d/hyprlock
+    1. Press Ctrl+Alt+F3 and log in with your normal password.
+    2. Run: sudo cp "$BACKUP" "$PAMFILE"
     3. Press Ctrl+Alt+F1 (or F2) to return to the screen.
 EOT
 }
@@ -36,9 +54,13 @@ conf_get() { sed -n "s/^$1=//p" "$CONF" 2>/dev/null | head -1; }
 status() {
     local id; id=$(conf_get usb_id)
     if [ -z "$id" ]; then echo "Security: not set up"; return 1; fi
-    echo "USB key: $id"
+    echo "USB storage key: $id"
     [ -e "/dev/disk/by-id/$id" ] && echo "USB key plugged in: yes" || echo "USB key plugged in: no"
-    grep -q pam_xps "$PAMFILE" 2>/dev/null && echo "Lock screen uses it: yes" || echo "Lock screen uses it: NO (run: xps-security enroll)"
+    if [ -n "$PAMFILE" ] && grep -q pam_xps "$PAMFILE" 2>/dev/null; then
+        echo "Lock screen PAM service ($PAM_SERVICE) uses it: yes"
+    else
+        echo "Lock screen PAM service: not configured (run xps-security enroll)"
+    fi
     systemctl --user is-active --quiet xps-usb-watch.service 2>/dev/null && echo "Locks when key is pulled: yes" || echo "Locks when key is pulled: no"
 }
 
@@ -57,26 +79,30 @@ build() {
 }
 
 disable() {
-    say "Switching the security lock off"
-    if [ -f "$BACKUP" ]; then sudo cp "$BACKUP" "$PAMFILE" && ok "Original lock screen settings restored"; else echo "  (nothing to restore)"; fi
-    sudo rm -f /etc/pam.d/xps-lock /etc/pam.d/xps-lock-test
+    say "Switching the USB-key check off"
+    [ -n "$PAMFILE" ] || die "No supported lock-screen PAM file exists (looked for omarchy-lock-password and hyprlock)."
+    if [ -f "$BACKUP" ]; then sudo cp "$BACKUP" "$PAMFILE" && ok "Original $PAM_SERVICE PAM settings restored"; else echo "  (no XPS backup found; PAM file left unchanged)"; fi
+    sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"
     systemctl --user disable --now xps-usb-watch.service >/dev/null 2>&1
-    ok "Off. Run 'xps-security enroll' to turn it on again."
+    ok "USB-key check is off. Password-based lock screen restored."
 }
 
 test_login() {
-    say "Testing a lock-screen login (nothing gets locked)"
-    [ -x "$B/xps-pamtest" ] || build || die "Could not build the test tool."
-    echo "  Type your normal password (you will not see it):"
-    "$B/xps-pamtest" "${1:-hyprlock}" "$USER"
+    say "Testing the lock-screen PAM service (this does not lock the session)"
+    [ -n "$PAM_SERVICE" ] || die "No supported lock-screen PAM file exists."
+    [ -x "${B:-}/xps-pamtest" ] || build || die "Could not build the test tool."
+    echo "  PAM service: $PAM_SERVICE"
+    echo "  Type your normal password (input will not be displayed):"
+    "$B/xps-pamtest" "${1:-$PAM_SERVICE}" "$USER"
 }
 
 enroll() {
-    [ -f "$PAMFILE" ] || die "Could not find the lock screen's settings file ($PAMFILE)."
+    [ -n "$PAMFILE" ] || die "Could not find a supported lock-screen PAM file. Looked for $PAM_DIR/omarchy-lock-password and $PAM_DIR/hyprlock."
+    [ -f "$SRC/pam_xps.c" ] && [ -f "$SRC/xps_check.c" ] || die "Security module source files are missing. Run the latest XPS Setup first."
     command -v gcc >/dev/null || die "The compiler is missing. Run the XPS Setup app first."
     sudo -v || die "Administrator permission is needed."
 
-    say "Step 1 of 4: your USB key"
+    say "Step 1 of 4: your USB storage key"
     local id=""
     while [ -z "$id" ]; do
         mapfile -t sticks < <(usb_sticks)
@@ -84,8 +110,8 @@ enroll() {
             read -r -p "  Plug in the USB stick you want to use as your key, then press Enter. " _
             continue
         fi
-        echo "  USB sticks found:"
-        local i=1
+        echo "  USB storage devices found:"
+        local i=1 s size
         for s in "${sticks[@]}"; do
             size=$(lsblk -dno SIZE "$(readlink -f "/dev/disk/by-id/$s")" 2>/dev/null)
             echo "    $i) $s  ($size)"; i=$((i+1))
@@ -113,39 +139,39 @@ enroll() {
     unset c1 c2
 
     sudo install -d -m755 /etc/xps-security || die "Could not create the settings folder."
-    printf 'usb_id=%s\ncode_hash=%s\n' "$id" "$hash" | sudo tee "$CONF.new" >/dev/null && sudo chmod 644 "$CONF.new" && sudo mv "$CONF.new" "$CONF" || die "Could not save the settings."
+    printf 'usb_id=%s\ncode_hash=%s\n' "$id" "$hash" | sudo tee "$CONF.new" >/dev/null && sudo chmod 600 "$CONF.new" && sudo mv "$CONF.new" "$CONF" || die "Could not save the settings."
     sudo install -Dm644 "$B/pam_xps.so" "$MOD" || die "Could not install the security module."
-    [ -f "$BACKUP" ] || sudo cp -a "$PAMFILE" "$BACKUP" || die "Could not back up the lock screen settings."
+    [ -f "$BACKUP" ] || sudo cp -a "$PAMFILE" "$BACKUP" || die "Could not back up the lock-screen settings."
 
-    make_stack "" | sudo tee /etc/pam.d/xps-lock >/dev/null || die "The lock screen settings have an unexpected layout."
-    make_stack "usbdir=/var/empty" | sudo tee /etc/pam.d/xps-lock-test >/dev/null
+    make_stack "" | sudo tee "$PAM_DIR/xps-lock" >/dev/null || die "The lock-screen PAM layout is unexpected; original settings are unchanged."
+    make_stack "usbdir=/var/empty" | sudo tee "$PAM_DIR/xps-lock-test" >/dev/null || die "Could not prepare the recovery test stack."
 
     echo
     echo "  Test A: key plugged in. Type your normal password."
-    "$B/xps-pamtest" xps-lock "$USER" | grep -q "AUTH OK" || { sudo rm -f /etc/pam.d/xps-lock /etc/pam.d/xps-lock-test; die "Test A failed (password plus key)."; }
+    "$B/xps-pamtest" xps-lock "$USER" | grep -q "AUTH OK" || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test A failed (password plus key)."; }
     ok "Password + key works"
     echo
     echo "  Test B: pretending the key is lost. Type your normal password, then your recovery code."
-    "$B/xps-pamtest" xps-lock-test "$USER" | grep -q "AUTH OK" || { sudo rm -f /etc/pam.d/xps-lock /etc/pam.d/xps-lock-test; die "Test B failed (password plus recovery code)."; }
+    "$B/xps-pamtest" xps-lock-test "$USER" | grep -q "AUTH OK" || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test B failed (password plus recovery code)."; }
     ok "Password + recovery code works"
 
-    say "Step 4 of 4: switching it on"
-    sudo cp /etc/pam.d/xps-lock "$PAMFILE" || die "Could not switch the lock screen over."
-    sudo rm -f /etc/pam.d/xps-lock-test
+    say "Step 4 of 4: switching on for $PAM_SERVICE"
+    sudo cp "$PAM_DIR/xps-lock" "$PAMFILE" || die "Could not switch the lock screen over."
+    sudo rm -f "$PAM_DIR/xps-lock-test"
     systemctl --user daemon-reload
-    systemctl --user enable --now xps-usb-watch.service >/dev/null 2>&1
+    systemctl --user enable --now xps-usb-watch.service >/dev/null 2>&1 || die "Could not enable the USB removal watcher; restore with xps-security disable."
     systemctl --user restart xps-usb-watch.service >/dev/null 2>&1
-    ok "On. The lock screen now asks for your password and needs your key (or your recovery code)."
-    ok "Pulling the key out locks the screen right away."
+    ok "USB check enabled for the existing $PAM_SERVICE PAM service. Password remains required."
+    ok "Removing the enrolled USB storage device locks the session."
     rescue
 }
 
 case "${1:-}" in
     enroll)  enroll ;;
     status)  status ;;
-    test)    test_login "${2:-hyprlock}" ;;
+    test)    test_login "${2:-}" ;;
     disable) disable ;;
-    *) echo "usage: xps-security enroll | status | test | disable"; exit 1 ;;
+    *) echo "usage: xps-security enroll | status | test [pam-service] | disable"; exit 1 ;;
 esac
 [ "${1:-}" = enroll ] || [ "${1:-}" = disable ] && { [ -t 0 ] && read -r -p "Press Enter to close. " _; }
 exit 0

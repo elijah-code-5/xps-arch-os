@@ -13,6 +13,9 @@ for f in AppRun install.sh payload/bin/xps-dictate payload/bin/xps-mode payload/
 done
 check python3 -m py_compile payload/bin/xps-assistant
 check bash -n payload/bin/xps-security
+check grep -q 'PAM_DIR/omarchy-lock-password' payload/bin/xps-security
+check grep -q 'PAM_DIR/hyprlock' payload/bin/xps-security
+check grep -q 'PAM_SERVICE=${PAMFILE##*/}' payload/bin/xps-security
 check grep -q 'qwen2.5-coder:1.5b' payload/bin/xps-assistant
 check grep -q 'MODEL = os.environ.get("XPS_MODEL", "xps-coder")' payload/bin/xps-assistant
 check grep -q '127.0.0.1:11434' payload/bin/xps-assistant
