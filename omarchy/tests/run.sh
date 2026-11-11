@@ -7,7 +7,8 @@ check() { if "$@"; then echo "PASS: $*" | cut -c1-110; else echo "FAIL: $*"; fai
 
 for f in AppRun install.sh payload/bin/xps-dictate payload/bin/xps-mode payload/bin/xps-mode-settings \
          payload/bin/xps-panel payload/bin/xps-shortcuts payload/bin/xps-server-setup \
-         payload/bin/xps-doctor payload/bin/xps-terminal payload/bin/xps-usb-watch payload/bin/xps-power; do
+         payload/bin/xps-doctor payload/bin/xps-terminal payload/bin/xps-usb-watch payload/bin/xps-power \
+         payload/bin/xps-apps payload/bin/xps-update; do
     check bash -n "$f"
 done
 check python3 -m py_compile payload/bin/xps-assistant
@@ -20,7 +21,6 @@ for mode in 'Arduino / ESP32' 'Linux sysadmin' 'Raspberry Pi' 'Code review' 'Bui
 done
 check test -s payload/share/device-brief.md
 check grep -q 'device_context' payload/bin/xps-assistant
-# security core: unit tests and syntax of the PAM module against stub headers
 if command -v gcc >/dev/null; then
     B=$(mktemp -d)
     check gcc -Wall -Werror -Ipayload/security -o "$B/t" tests/security/test_check.c payload/security/xps_check.c -lcrypt
@@ -29,6 +29,9 @@ if command -v gcc >/dev/null; then
     check gcc -Wall -Itests/stubs -Ipayload/security -fsyntax-only payload/security/xps_pamtest.c
 fi
 check python3 -I -c "import json;json.load(open('payload/taskbar/xps-taskbar.jsonc'))"
+grep -q '"on-click": "minimize-raise"' payload/taskbar/xps-taskbar.jsonc && echo "PASS: taskbar toggles minimize/restore" || { echo "FAIL: taskbar minimize/restore action missing"; fail=1; }
+grep -q 'xps-apps' payload/taskbar/xps-taskbar.jsonc && echo "PASS: taskbar Apps button uses launcher fallback" || { echo "FAIL: taskbar Apps launcher missing"; fail=1; }
+grep -q 'omarchy update' payload/bin/xps-update && echo "PASS: update button calls Omarchy updater" || { echo "FAIL: safe Omarchy update action missing"; fail=1; }
 
 # Mode schedule: weekday, weekend, and edges
 T=$(mktemp -d); export HOME="$T/home"; mkdir -p "$HOME/.config/xps-modes"
@@ -66,7 +69,7 @@ if [ "$(id -u)" = 0 ] && command -v setpriv >/dev/null; then
     echo "x" > "$T/hreg/.config/hypr/bindings.lua"
     PATH="$T/bin:$PATH" HOME="$T/hreg" XPS_DRY=1 XPS_TEST_REAL_INSTALL=1 XPS_ROOT="$T/root" \
         XPS_PAYLOAD="$T/locked/payload" bash install.sh </dev/null >"$T/reg.log" 2>&1
-    for f in xps-dictate xps-assistant xps-mode xps-panel xps-shortcuts xps-server-setup xps-mode-settings xps-security whisper-cli; do
+    for f in xps-dictate xps-assistant xps-mode xps-panel xps-shortcuts xps-server-setup xps-mode-settings xps-security xps-apps xps-update whisper-cli; do
         if [ "$f" = whisper-cli ]; then [ -e payload/whisper-cli ] || continue; fi
         [ -x "$T/root/usr/local/bin/$f" ] && echo "PASS: locked payload -> $f installed" || { echo "FAIL: $f not installed from a locked payload"; fail=1; }
     done

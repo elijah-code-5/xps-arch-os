@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Ask before starting Omarchy's supported updater; never run pacman upgrades directly.
+set -u
+if ! command -v omarchy >/dev/null 2>&1; then
+    command -v notify-send >/dev/null 2>&1 && notify-send "XPS update" "The Omarchy update command was not found. Open the Omarchy menu to update." 
+    exit 1
+fi
+if ! command -v yad >/dev/null 2>&1 || ! yad --question --center --title="Update Omarchy" \
+    --text="Run the official Omarchy system update now?\n\nSave your work first. Omarchy handles its package updates and migrations." \
+    --button="Cancel:1" --button="Update:0"; then
+    exit 0
+fi
+exec xps-terminal omarchy update

@@ -2,23 +2,29 @@
   "name": "xps-taskbar",
   "layer": "top",
   "position": "bottom",
-  "height": 36,
+  "height": 38,
   "spacing": 6,
-  "modules-left": ["custom/apps"],
+  "modules-left": ["custom/apps", "custom/update"],
   "modules-center": ["wlr/taskbar"],
   "modules-right": ["custom/panel", "clock"],
   "custom/apps": {
-    "format": "  Apps ",
+    "format": "  Apps  ",
     "tooltip": false,
-    "on-click": "bash -c 'if command -v omarchy-launch-walker >/dev/null; then omarchy-launch-walker; else walker; fi'"
+    "on-click": "xps-apps"
+  },
+  "custom/update": {
+    "format": "  Update  ",
+    "tooltip": false,
+    "on-click": "xps-update"
   },
   "wlr/taskbar": {
     "format": "{icon} {title:.22}",
     "icon-size": 20,
     "all-outputs": true,
-    "tooltip-format": "{title}\nClick: open   Middle-click: close",
-    "on-click": "activate",
-    "on-click-middle": "close"
+    "tooltip-format": "{title}\nClick: minimize/restore   Middle-click: close   Right-click: activate",
+    "on-click": "minimize-raise",
+    "on-click-middle": "close",
+    "on-click-right": "activate"
   },
   "custom/panel": {
     "format": " Panel ",

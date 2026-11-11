@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Open whichever application launcher is available on this Omarchy installation.
+set -u
+for app in omarchy-launch-walker walker; do
+    if command -v "$app" >/dev/null 2>&1; then
+        exec "$app"
+    fi
+done
+if command -v omarchy-menu >/dev/null 2>&1; then
+    exec omarchy-menu
+fi
+if command -v rofi >/dev/null 2>&1; then
+    exec rofi -show drun
+fi
+if command -v notify-send >/dev/null 2>&1; then
+    notify-send "XPS taskbar" "No supported app launcher was found (Walker, Omarchy menu, or Rofi)."
+fi
+exit 1
