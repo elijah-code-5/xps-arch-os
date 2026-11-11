@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Device sign-in setup
-Comment=Review password, passkey and face-authentication options safely
-Exec=xps-security
+Name=Security setup (USB key)
+Comment=Set up password + USB key + recovery code for the lock screen
+Exec=xps-terminal xps-security enroll
 Icon=system-lock-screen
 Categories=Settings;Security;

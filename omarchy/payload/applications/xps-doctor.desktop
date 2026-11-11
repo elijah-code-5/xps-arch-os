@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Check everything
+Comment=Tells you what works and what does not
+Exec=xps-doctor
+Icon=utilities-system-monitor
+Categories=Utility;

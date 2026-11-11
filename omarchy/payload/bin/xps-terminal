@@ -1,0 +1,8 @@
+#!/bin/bash
+# Open a command in a terminal window (used by menu entries that need one).
+for t in "xdg-terminal-exec" "alacritty -e" "ghostty -e" "kitty" "foot" "konsole -e" "gnome-terminal --" "xterm -e"; do
+    read -ra term <<< "$t"
+    command -v "${term[0]}" >/dev/null 2>&1 && exec "${term[@]}" "$@"
+done
+command -v notify-send >/dev/null && notify-send "No terminal program found"
+exit 1

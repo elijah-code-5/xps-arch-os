@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Battery saver that stays out of your way: power-saver on battery, balanced on the charger
+# (performance while coding on the charger if the laptop offers it). If you pick a profile by hand,
+# it leaves your choice alone until you plug in or unplug.
+command -v powerprofilesctl >/dev/null 2>&1 || exit 0
+supply="${XPS_SUPPLY:-/sys/class/power_supply}"
+state="${XDG_STATE_HOME:-$HOME/.local/state}/xps-power"
+mkdir -p "$(dirname "$state")"
+
+laptop=0; ac=0
+for d in "$supply"/*; do
+    [ -f "$d/type" ] || continue
+    [ "$(cat "$d/type")" = Battery ] && laptop=1
+    [ -f "$d/online" ] && [ "$(cat "$d/online")" = 1 ] && ac=1
+done
+[ "$laptop" = 1 ] || exit 0
+
+mode=$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/xps-mode" 2>/dev/null || echo free)
+profiles=$(powerprofilesctl list 2>/dev/null)
+has() { grep -Eq "^[[:space:]]*\*?[[:space:]]*$1:" <<<"$profiles"; }
+
+want=balanced
+if [ "$ac" = 0 ]; then
+    [ "$mode" = coding ] && want=balanced || want=power-saver
+else
+    if [ "$mode" = coding ] && has performance; then want=performance; fi
+fi
+has "$want" || want=balanced
+
+cur=$(powerprofilesctl get 2>/dev/null)
+lastac=""; last=""
+[ -f "$state" ] && read -r lastac last < "$state"
+if [ "$lastac" = "$ac" ] && [ -n "$last" ] && [ "$cur" != "$last" ]; then exit 0   # you changed it by hand
+fi
+[ "$cur" = "$want" ] || powerprofilesctl set "$want"
+echo "$ac $want" > "$state"

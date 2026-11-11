@@ -1,0 +1,9 @@
+[Unit]
+Description=Check power source and time of day
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=45s
+
+[Install]
+WantedBy=timers.target

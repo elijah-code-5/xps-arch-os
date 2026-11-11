@@ -6,17 +6,28 @@ fail=0
 check() { if "$@"; then echo "PASS: $*" | cut -c1-110; else echo "FAIL: $*"; fail=1; fi; }
 
 for f in AppRun install.sh payload/bin/xps-dictate payload/bin/xps-mode payload/bin/xps-mode-settings \
-         payload/bin/xps-panel payload/bin/xps-shortcuts payload/bin/xps-server-setup; do
+         payload/bin/xps-panel payload/bin/xps-shortcuts payload/bin/xps-server-setup \
+         payload/bin/xps-doctor payload/bin/xps-terminal payload/bin/xps-usb-watch payload/bin/xps-power; do
     check bash -n "$f"
 done
 check python3 -m py_compile payload/bin/xps-assistant
-check python3 -m py_compile payload/bin/xps-security
+check bash -n payload/bin/xps-security
 check grep -q 'qwen2.5-coder:1.5b' payload/bin/xps-assistant
 check grep -q 'MODEL = os.environ.get("XPS_MODEL", "xps-coder")' payload/bin/xps-assistant
 check grep -q '127.0.0.1:11434' payload/bin/xps-assistant
 for mode in 'Arduino / ESP32' 'Linux sysadmin' 'Raspberry Pi' 'Code review' 'Build / debug'; do
     grep -Fq "$mode" payload/bin/xps-assistant || { echo "FAIL: missing assistant mode: $mode"; fail=1; }
 done
+check test -s payload/share/device-brief.md
+check grep -q 'device_context' payload/bin/xps-assistant
+# security core: unit tests and syntax of the PAM module against stub headers
+if command -v gcc >/dev/null; then
+    B=$(mktemp -d)
+    check gcc -Wall -Werror -Ipayload/security -o "$B/t" tests/security/test_check.c payload/security/xps_check.c -lcrypt
+    check "$B/t"
+    check gcc -Wall -Itests/stubs -Ipayload/security -fsyntax-only payload/security/pam_xps.c
+    check gcc -Wall -Itests/stubs -Ipayload/security -fsyntax-only payload/security/xps_pamtest.c
+fi
 check python3 -I -c "import json;json.load(open('payload/taskbar/xps-taskbar.jsonc'))"
 
 # Mode schedule: weekday, weekend, and edges

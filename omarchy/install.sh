@@ -48,7 +48,11 @@ undo() {
     for f in "$HYPR/bindings.lua" "$HYPR/bindings.conf"; do strip_block "$f" && [ -f "$f" ] && ok "Shortcuts removed from $(basename "$f")"; done
     rm -f "$APPS"/xps-*.desktop
     systemctl --user disable --now xps-mode-auto.timer >/dev/null 2>&1
-    systemctl --user disable --now xps-taskbar.service >/dev/null 2>&1
+    systemctl --user disable --now xps-taskbar.service xps-power.timer xps-usb-watch.service >/dev/null 2>&1
+    if [ -f /etc/pam.d/hyprlock.before-xps ] && command -v xps-security >/dev/null 2>&1; then
+        echo "  Turning the USB-key lock off first, so you can still log in..."
+        xps-security disable
+    fi
     rm -f "$HOME/.config/systemd/user"/xps-* "$HOME/.config/waybar"/xps-taskbar.*
     ok "Menu entries, taskbar and the mode timer removed"
     pause_end
@@ -123,6 +127,8 @@ PKGS=(
     ccache mold cmake ninja base-devel git
     # memory safety
     zram-generator earlyoom
+    # battery and heat on this laptop, lock-screen module build
+    thermald power-profiles-daemon pam
 )
 if [ "$UPDATED" = 1 ]; then
     say "Installing programs"
@@ -173,6 +179,25 @@ done
 if [ -f "$PAYLOAD/whisper-cli" ]; then
     run sudo install -Dm755 "$PAYLOAD/whisper-cli" "$R/usr/local/bin/whisper-cli" || { bad "Could not install the speech engine"; TOOLFAIL=1; }
 fi
+# security sources (built on this laptop when you run "Security setup") and the device brief for the assistant
+run sudo mkdir -p "$R/usr/local/share/xps-security/src" "$R/usr/local/share/xps"
+for f in "$PAYLOAD"/security/*; do
+    run sudo install -Dm644 "$f" "$R/usr/local/share/xps-security/src/$(basename "$f")" || { bad "Could not install security files"; TOOLFAIL=1; }
+done
+run sudo install -Dm644 "$PAYLOAD/share/device-brief.md" "$R/usr/local/share/xps/device-brief.md" || { bad "Could not install the device brief"; TOOLFAIL=1; }
+# keep a copy of this app so "repair" works later from the menu
+if [ -n "${APPIMAGE:-}" ] && [ -f "$APPIMAGE" ] && [ "$DRY" != 1 ]; then
+    mkdir -p "$HOME/.local/share/xps"; cp -f "$APPIMAGE" "$HOME/.local/share/xps/XPS-Setup.AppImage" && chmod +x "$HOME/.local/share/xps/XPS-Setup.AppImage"
+    cat > "$HOME/.local/share/applications/xps-repair.desktop" <<DESK
+[Desktop Entry]
+Type=Application
+Name=XPS Setup (repair)
+Comment=Run the setup again; it skips what already works
+Exec=$HOME/.local/share/xps/XPS-Setup.AppImage
+Icon=system-software-update
+Categories=Utility;
+DESK
+fi
 [ "$TOOLFAIL" = 0 ] && ok "Voice typing, assistant, modes, control panel and shortcuts list installed"
 
 mkdir -p "$APPS" "$HOME/.config/systemd/user" "$HOME/.config/xps-modes" "$HOME/.local/share/xps-models/whisper"
@@ -185,6 +210,9 @@ if [ "$DRY" != 1 ]; then
     systemctl --user daemon-reload
     systemctl --user enable --now xps-mode-auto.timer >/dev/null 2>&1 && ok "Coding/free time modes switch by the clock (13:00-18:00 weekdays, 08:00-18:00 weekends)" || bad "Mode timer did not start"
     command -v xps-mode >/dev/null 2>&1 && xps-mode auto >/dev/null 2>&1
+    systemctl --user enable --now xps-power.timer >/dev/null 2>&1 && ok "Battery saver: power-saver on battery, balanced when plugged in" || bad "Battery saver timer did not start"
+    systemctl --user enable --now xps-usb-watch.service >/dev/null 2>&1 || bad "USB key watcher did not start"
+    sudo systemctl enable --now thermald.service power-profiles-daemon.service >/dev/null 2>&1 || note "Heat/power services could not be enabled (Omarchy may manage them)."
 fi
 ok "Menu entries added (press Super+Space and type: XPS, Task, Assistant, Voice...)"
 
@@ -272,7 +300,7 @@ fi
 # --- self-check: prove it works, do not just trust the steps above -----------------------------------------------
 say "Checking that everything really works"
 if [ "$DRY" != 1 ]; then
-    for c in gnome-system-monitor kdenlive libreoffice nextcloud ollama wtype yad arduino-cli xps-mode xps-dictate xps-assistant xps-panel xps-shortcuts xps-server-setup whisper-cli; do
+    for c in gnome-system-monitor kdenlive libreoffice nextcloud ollama wtype yad arduino-cli xps-mode xps-dictate xps-assistant xps-panel xps-shortcuts xps-server-setup xps-doctor xps-security xps-usb-watch xps-power xps-terminal whisper-cli; do
         command -v "$c" >/dev/null 2>&1 || bad "'$c' is not installed or not found"
     done
     /usr/bin/python3 -c "import tkinter" >/dev/null 2>&1 || bad "The assistant window needs Python's tk, which is missing"
@@ -300,7 +328,9 @@ cat <<'EOF'
     3. Super+F7 = task manager. Super+F9 = voice typing. Super+F10 = AI assistant.
        If those F-keys do nothing on your Dell: press Fn+Esc once (switches the function row), or hold Fn.
        Always works: Super+Space, then type "Task Manager" / "Assistant" / "XPS".
-  Still to come: the three-step login (password + USB stick + 4-digit code). It is not installed yet.
+  USB-key lock: open "Security setup (USB key)" from Super+Space. It asks for your password, a USB stick and
+  a recovery code you choose. Do that once, then press "Lock screen" in the control panel (Super+F8) to try it.
+  If anything seems off, open "Check everything" (Super+Space). It saves a report to ~/xps-doctor.txt.
   A full log is in: ~/.local/state/xps-setup.log
 EOF
 pause_end

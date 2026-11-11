@@ -20,6 +20,11 @@ jobs:
       - name: Run the checks
         run: sudo env PYTHONDONTWRITEBYTECODE=1 bash omarchy/tests/run.sh
 
+      - name: Real PAM login test (Arch Linux container)
+        run: |
+          docker run --rm -v "$PWD/omarchy:/w:ro" archlinux:latest \
+            bash /w/tests/security/test-pam.sh /w/payload/security
+
       - name: Assemble the app
         run: |
           set -e

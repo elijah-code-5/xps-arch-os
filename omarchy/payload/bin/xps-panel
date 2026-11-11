@@ -14,4 +14,6 @@ exec yad --title="XPS Control Panel" --center --width=520 --borders=14 \
     --field="Video editor!applications-multimedia:FBTN" "kdenlive &" \
     --field="Office!applications-office:FBTN" "libreoffice &" \
     --field="Shortcuts list!input-keyboard:FBTN" "xps-shortcuts &" \
-    --field="Lock screen!system-lock-screen:FBTN" "omarchy-lock-screen &"
+    --field="Lock screen!system-lock-screen:FBTN" "omarchy-lock-screen &" \
+    --field="Security setup (USB key)!security-high:FBTN" "xps-terminal xps-security enroll &" \
+    --field="Check everything!dialog-ok:FBTN" "xps-doctor &"

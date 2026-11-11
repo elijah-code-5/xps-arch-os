@@ -1,0 +1,20 @@
+#!/bin/bash
+# Locks the screen the moment your enrolled USB key is pulled out.
+conf="${XPS_CONF:-/etc/xps-security/xps.conf}"
+dir="${XPS_USBDIR:-/dev/disk/by-id}"
+poll="${XPS_POLL:-2}"
+id=$(sed -n 's/^usb_id=//p' "$conf" 2>/dev/null | head -1)
+[ -n "$id" ] || exit 0          # not set up: nothing to watch
+
+present() { [ -e "$dir/$id" ]; }
+lock_now() {
+    if [ -n "$XPS_LOCK_CMD" ]; then eval "$XPS_LOCK_CMD"
+    elif command -v omarchy-lock-screen >/dev/null 2>&1; then omarchy-lock-screen
+    else loginctl lock-session; fi
+}
+
+was=0; present && was=1
+while sleep "$poll"; do
+    if present; then was=1
+    elif [ "$was" = 1 ]; then was=0; lock_now; fi
+done

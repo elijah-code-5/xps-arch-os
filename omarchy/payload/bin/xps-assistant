@@ -60,6 +60,44 @@ def system_prompt(mode):
     return BASE_SYSTEM + "\n\nSelected mode: " + mode + ". " + MODES[mode]
 
 
+def device_context(mode):
+    """The system prompt: base rules, the device brief, and a few live facts about the machine."""
+    parts = [system_prompt(mode)]
+    for path in ("/usr/local/share/xps/device-brief.md", "/usr/share/xps/device-brief.md"):
+        try:
+            with open(path) as fh:
+                parts.append(fh.read())
+            break
+        except OSError:
+            pass
+    facts = []
+    try:
+        with open("/etc/os-release") as fh:
+            for line in fh:
+                if line.startswith("PRETTY_NAME="):
+                    facts.append("System now: " + line.split("=", 1)[1].strip().strip('"'))
+    except OSError:
+        pass
+    facts.append("Kernel: " + os.uname().release)
+    try:
+        with open("/proc/meminfo") as fh:
+            info = {l.split(":")[0]: int(l.split()[1]) for l in fh if ":" in l}
+        facts.append("Memory free right now: %.1f GB of %.1f GB" % (info["MemAvailable"] / 1048576, info["MemTotal"] / 1048576))
+    except Exception:
+        pass
+    for bat in ("BAT0", "BAT1"):
+        try:
+            with open("/sys/class/power_supply/%s/capacity" % bat) as fh:
+                pct = fh.read().strip()
+            with open("/sys/class/power_supply/%s/status" % bat) as fh:
+                facts.append("Battery: %s%% (%s)" % (pct, fh.read().strip()))
+            break
+        except OSError:
+            pass
+    parts.append("## Live facts\n" + "\n".join(facts))
+    return "\n\n".join(parts)
+
+
 def server_up():
     try:
         with urllib.request.urlopen(HOST, timeout=1):
@@ -170,7 +208,7 @@ class App:
         self.entry.bind("<Return>", lambda event: self.send())
         self.btn = ttk.Button(row, text="Send", command=self.send)
         self.btn.pack(side="left", padx=(6, 0))
-        self.messages = [{"role": "system", "content": system_prompt(self.mode.get())}]
+        self.messages = [{"role": "system", "content": device_context(self.mode.get())}]
         self.busy = True
         self.say("Starting local coding assistant...\n")
         threading.Thread(target=self.boot, daemon=True).start()
@@ -186,7 +224,7 @@ class App:
 
     def change_mode(self, _event=None):
         selected = self.mode.get()
-        self.messages = [{"role": "system", "content": system_prompt(selected)}]
+        self.messages = [{"role": "system", "content": device_context(selected)}]
         self.say(f"Mode changed to {selected}. Previous chat context was cleared.\n\n")
 
     def boot(self):

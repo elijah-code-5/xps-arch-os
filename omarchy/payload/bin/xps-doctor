@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Checks every feature and says in plain words what works and what does not.
+#   xps-doctor          show the report in a window
+#   xps-doctor --text   print it here
+report() {
+    local bad=0
+    ok()   { echo "  [ OK ]  $1"; }
+    no()   { echo "  [ !! ]  $1"; bad=1; }
+    have() { command -v "$1" >/dev/null 2>&1 && ok "$2" || no "$2 is NOT installed (run XPS Setup again)"; }
+    echo "ELIJAH LAPTOP: CHECK EVERYTHING   ($(date '+%Y-%m-%d %H:%M'))"
+    echo
+    echo "PROGRAMS"
+    have gnome-system-monitor "Task manager"
+    have kdenlive "Video editor"
+    have libreoffice "Office"
+    have nextcloud "Nextcloud sync"
+    have arduino-cli "Arduino / ESP32 tools"
+    have code "VS Code"
+    echo
+    echo "MY TOOLS"
+    for t in xps-panel xps-dictate xps-assistant xps-mode xps-security xps-usb-watch xps-power; do have "$t" "$t"; done
+    echo
+    echo "TASKBAR"
+    if systemctl --user is-active --quiet xps-taskbar.service 2>/dev/null; then ok "Taskbar is running"
+    else
+        no "Taskbar is not running. Last messages:"
+        journalctl --user -u xps-taskbar.service -n 10 --no-pager 2>/dev/null | sed 's/^/           /'
+        command -v waybar >/dev/null && echo "           waybar: $(waybar --version 2>&1 | head -1)" || echo "           waybar is not installed"
+    fi
+    echo
+    echo "SHORTCUTS"
+    f="$HOME/.config/hypr/bindings.lua"; [ -f "$f" ] || f="$HOME/.config/hypr/bindings.conf"
+    if grep -q "XPS-SETUP BEGIN" "$f" 2>/dev/null; then ok "Shortcuts are in $(basename "$f") (F7 task manager, F8 panel, F9 voice, F10 assistant)"; echo "           If F-keys do nothing on your Dell, press Fn+Esc once."
+    else no "Shortcuts are not set up"; fi
+    echo
+    echo "VOICE AND ASSISTANT"
+    [ -f "$HOME/.local/share/xps-models/whisper/ggml-base.en.bin" ] && ok "Speech model present" || no "Speech model missing"
+    if command -v ollama >/dev/null 2>&1; then
+        if ls "$HOME/.ollama/models/manifests" >/dev/null 2>&1 || ollama list 2>/dev/null | grep -q qwen; then ok "Assistant model present"; else no "Assistant model missing"; fi
+    else no "Assistant engine (ollama) not installed"; fi
+    /usr/bin/python3 -c "import tkinter" >/dev/null 2>&1 && ok "Assistant window can open" || no "Python tk is missing (assistant window cannot open)"
+    echo
+    echo "SECURITY (password + USB key, recovery code if the key is lost)"
+    if command -v xps-security >/dev/null 2>&1; then xps-security status 2>&1 | sed 's/^/  /'; else no "Security tool missing"; fi
+    echo
+    echo "MODES AND BATTERY"
+    command -v xps-mode >/dev/null && echo "  Right now the clock says: $(xps-mode pick)"
+    command -v powerprofilesctl >/dev/null && echo "  Power profile: $(powerprofilesctl get)" || echo "  (no power profile service found)"
+    systemctl --user is-active --quiet xps-power.timer 2>/dev/null && ok "Battery saver switching is on" || no "Battery saver switching is off"
+    echo
+    [ "$bad" = 0 ] && echo "EVERYTHING LOOKS GOOD." || echo "Something needs attention (lines marked [ !! ]). Run XPS Setup again, or send me this report."
+}
+out=$(report 2>&1)
+printf '%s\n' "$out" > "$HOME/xps-doctor.txt"
+if [ "$1" = "--text" ] || ! command -v yad >/dev/null 2>&1; then printf '%s\n' "$out"
+else printf '%s\n' "$out" | yad --title="Check everything" --center --width=760 --height=620 --text-info --fontname="monospace 11" --button="Close:0" --text="A copy is saved as xps-doctor.txt in your home folder."
+fi

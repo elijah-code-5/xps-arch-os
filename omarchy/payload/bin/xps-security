@@ -1,62 +1,151 @@
-#!/usr/bin/python3
-"""Local security center: offers session locking and honest device-security checks."""
-import subprocess
-import tkinter as tk
-from tkinter import ttk
+#!/usr/bin/env bash
+# xps-security: the lock screen asks for your password AND your USB key.
+# Lost the key? It asks for your recovery code instead. Everything is tested before it is switched on.
+#   xps-security enroll    set up (or change) the USB key and the code
+#   xps-security status    show what is set up
+#   xps-security test      try a lock-screen login without locking anything
+#   xps-security disable   switch it off and restore the original lock screen
+SRC=/usr/local/share/xps-security/src
+CONF=/etc/xps-security/xps.conf
+PAMFILE=/etc/pam.d/hyprlock
+BACKUP=/etc/pam.d/hyprlock.before-xps
+MOD=/usr/lib/security/pam_xps.so
 
+say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
+ok()   { printf '  \033[32m[ok]\033[0m %s\n' "$*"; }
+die()  { printf '  \033[31m[stopped]\033[0m %s\n' "$*"; echo "  Nothing was switched on. Your lock screen is unchanged."; [ -t 0 ] && read -r -p "  Press Enter to close. " _; exit 1; }
+rescue() {
+    cat <<'EOT'
 
-def session_is_encrypted():
-    try:
-        result = subprocess.run(
-            ["lsblk", "-no", "FSTYPE", "/"], check=False, capture_output=True, text=True, timeout=4
-        )
-        return "crypto_LUKS" in result.stdout or "crypt" in result.stdout
-    except (OSError, subprocess.TimeoutExpired):
-        return False
+  IF YOU EVER CANNOT UNLOCK:
+    1. Press Ctrl+Alt+F3, log in with your normal password.
+    2. Run:  sudo cp /etc/pam.d/hyprlock.before-xps /etc/pam.d/hyprlock
+    3. Press Ctrl+Alt+F1 (or F2) to return to the screen.
+EOT
+}
+usb_sticks() {
+    local p
+    for p in /dev/disk/by-id/usb-*; do
+        [ -e "$p" ] || continue
+        case "$p" in *-part[0-9]*) continue;; esac
+        basename "$p"
+    done
+}
+conf_get() { sed -n "s/^$1=//p" "$CONF" 2>/dev/null | head -1; }
 
+status() {
+    local id; id=$(conf_get usb_id)
+    if [ -z "$id" ]; then echo "Security: not set up"; return 1; fi
+    echo "USB key: $id"
+    [ -e "/dev/disk/by-id/$id" ] && echo "USB key plugged in: yes" || echo "USB key plugged in: no"
+    grep -q pam_xps "$PAMFILE" 2>/dev/null && echo "Lock screen uses it: yes" || echo "Lock screen uses it: NO (run: xps-security enroll)"
+    systemctl --user is-active --quiet xps-usb-watch.service 2>/dev/null && echo "Locks when key is pulled: yes" || echo "Locks when key is pulled: no"
+}
 
-class SecurityCenter:
-    def __init__(self, root):
-        self.root = root
-        root.title("XPS Security Center")
-        root.geometry("620x420")
-        root.minsize(520, 360)
+make_stack() { # $1 = extra module arguments
+    local last
+    last=$(grep -n '^auth' "$BACKUP" | tail -1 | cut -d: -f1)
+    [ -n "$last" ] || return 1
+    awk -v last="$last" -v args="$1" 'NR==last{print; print "auth       required     pam_xps.so " args; next} {print}' "$BACKUP"
+}
 
-        ttk.Label(root, text="Device security", font=("Sans", 18, "bold")).pack(anchor="w", padx=20, pady=(20, 8))
-        ttk.Label(
-            root,
-            text=("This center provides real session locking and practical checks. It does not install fake per-app "
-                  "password prompts or alter PAM. A prompt around an app can be bypassed and is not an access boundary."),
-            wraplength=570, justify="left",
-        ).pack(fill="x", padx=20, pady=8)
+build() {
+    B=$(mktemp -d)
+    gcc -O2 -Wall -shared -fPIC -I"$SRC" -o "$B/pam_xps.so" "$SRC/pam_xps.c" "$SRC/xps_check.c" -lpam -lcrypt || return 1
+    gcc -O2 -Wall -I"$SRC" -o "$B/xps-pamtest" "$SRC/xps_pamtest.c" -lpam || return 1
+    gcc -O2 -Wall -I"$SRC" -o "$B/xps-codehash" "$SRC/xps_codehash.c" "$SRC/xps_check.c" -lcrypt || return 1
+}
 
-        self.encryption = ttk.Label(root, wraplength=570, justify="left")
-        self.encryption.pack(fill="x", padx=20, pady=8)
-        if session_is_encrypted():
-            self.encryption.configure(text="Storage check: the root filesystem appears to use device encryption. Confirm your home/data volumes too.")
-        else:
-            self.encryption.configure(text="Storage check: could not confirm encryption for /. Check Omarchy's installation settings; full-disk encryption is strongest when enabled during installation.")
+disable() {
+    say "Switching the security lock off"
+    if [ -f "$BACKUP" ]; then sudo cp "$BACKUP" "$PAMFILE" && ok "Original lock screen settings restored"; else echo "  (nothing to restore)"; fi
+    sudo rm -f /etc/pam.d/xps-lock /etc/pam.d/xps-lock-test
+    systemctl --user disable --now xps-usb-watch.service >/dev/null 2>&1
+    ok "Off. Run 'xps-security enroll' to turn it on again."
+}
 
-        ttk.Label(
-            root,
-            text=("Recommended: keep a strong account password, enable automatic idle locking in Omarchy settings, "
-                  "and use encrypted storage for private source code and credentials. The AI assistant uses a local "
-                  "Ollama endpoint; do not enter secrets you would not store in a local chat."),
-            wraplength=570, justify="left",
-        ).pack(fill="x", padx=20, pady=8)
-        ttk.Button(root, text="Lock screen now", command=self.lock_screen).pack(anchor="e", padx=20, pady=14)
+test_login() {
+    say "Testing a lock-screen login (nothing gets locked)"
+    [ -x "$B/xps-pamtest" ] || build || die "Could not build the test tool."
+    echo "  Type your normal password (you will not see it):"
+    "$B/xps-pamtest" "${1:-hyprlock}" "$USER"
+}
 
-    def lock_screen(self):
-        for command in (["omarchy-lock-screen"], ["loginctl", "lock-session"]):
-            try:
-                subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return
-            except FileNotFoundError:
-                continue
-        self.encryption.configure(text="Could not find a supported screen-lock command. Use Omarchy's lock-screen shortcut/menu.")
+enroll() {
+    [ -f "$PAMFILE" ] || die "Could not find the lock screen's settings file ($PAMFILE)."
+    command -v gcc >/dev/null || die "The compiler is missing. Run the XPS Setup app first."
+    sudo -v || die "Administrator permission is needed."
 
+    say "Step 1 of 4: your USB key"
+    local id=""
+    while [ -z "$id" ]; do
+        mapfile -t sticks < <(usb_sticks)
+        if [ ${#sticks[@]} -eq 0 ]; then
+            read -r -p "  Plug in the USB stick you want to use as your key, then press Enter. " _
+            continue
+        fi
+        echo "  USB sticks found:"
+        local i=1
+        for s in "${sticks[@]}"; do
+            size=$(lsblk -dno SIZE "$(readlink -f "/dev/disk/by-id/$s")" 2>/dev/null)
+            echo "    $i) $s  ($size)"; i=$((i+1))
+        done
+        read -r -p "  Which number is your key? " n
+        if [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -ge 1 ] && [ "$n" -le ${#sticks[@]} ]; then id=${sticks[$((n-1))]}; else echo "  Please type one of the numbers."; fi
+    done
+    ok "Key: $id"
 
-if __name__ == "__main__":
-    window = tk.Tk()
-    SecurityCenter(window)
-    window.mainloop()
+    say "Step 2 of 4: your recovery code (used if the key is lost)"
+    echo "  Choose 4 to 8 digits. Pick one you have NOT typed in any chat or shared. You will not see it as you type."
+    local c1 c2
+    while true; do
+        read -r -s -p "  Recovery code: " c1; echo
+        read -r -s -p "  Again: " c2; echo
+        [[ "$c1" =~ ^[0-9]{4,8}$ ]] || { echo "  Use only digits, 4 to 8 of them."; continue; }
+        [ "$c1" = "$c2" ] || { echo "  They did not match. Try again."; continue; }
+        break
+    done
+
+    say "Step 3 of 4: building and testing (nothing is switched on yet)"
+    build || die "Could not build the security module."
+    local hash; hash=$("$B/xps-codehash" <<<"$c1")
+    [ -n "$hash" ] || die "Could not scramble the code."
+    unset c1 c2
+
+    sudo install -d -m755 /etc/xps-security || die "Could not create the settings folder."
+    printf 'usb_id=%s\ncode_hash=%s\n' "$id" "$hash" | sudo tee "$CONF.new" >/dev/null && sudo chmod 644 "$CONF.new" && sudo mv "$CONF.new" "$CONF" || die "Could not save the settings."
+    sudo install -Dm644 "$B/pam_xps.so" "$MOD" || die "Could not install the security module."
+    [ -f "$BACKUP" ] || sudo cp -a "$PAMFILE" "$BACKUP" || die "Could not back up the lock screen settings."
+
+    make_stack "" | sudo tee /etc/pam.d/xps-lock >/dev/null || die "The lock screen settings have an unexpected layout."
+    make_stack "usbdir=/var/empty" | sudo tee /etc/pam.d/xps-lock-test >/dev/null
+
+    echo
+    echo "  Test A: key plugged in. Type your normal password."
+    "$B/xps-pamtest" xps-lock "$USER" | grep -q "AUTH OK" || { sudo rm -f /etc/pam.d/xps-lock /etc/pam.d/xps-lock-test; die "Test A failed (password plus key)."; }
+    ok "Password + key works"
+    echo
+    echo "  Test B: pretending the key is lost. Type your normal password, then your recovery code."
+    "$B/xps-pamtest" xps-lock-test "$USER" | grep -q "AUTH OK" || { sudo rm -f /etc/pam.d/xps-lock /etc/pam.d/xps-lock-test; die "Test B failed (password plus recovery code)."; }
+    ok "Password + recovery code works"
+
+    say "Step 4 of 4: switching it on"
+    sudo cp /etc/pam.d/xps-lock "$PAMFILE" || die "Could not switch the lock screen over."
+    sudo rm -f /etc/pam.d/xps-lock-test
+    systemctl --user daemon-reload
+    systemctl --user enable --now xps-usb-watch.service >/dev/null 2>&1
+    systemctl --user restart xps-usb-watch.service >/dev/null 2>&1
+    ok "On. The lock screen now asks for your password and needs your key (or your recovery code)."
+    ok "Pulling the key out locks the screen right away."
+    rescue
+}
+
+case "${1:-}" in
+    enroll)  enroll ;;
+    status)  status ;;
+    test)    test_login "${2:-hyprlock}" ;;
+    disable) disable ;;
+    *) echo "usage: xps-security enroll | status | test | disable"; exit 1 ;;
+esac
+[ "${1:-}" = enroll ] || [ "${1:-}" = disable ] && { [ -t 0 ] && read -r -p "Press Enter to close. " _; }
+exit 0
