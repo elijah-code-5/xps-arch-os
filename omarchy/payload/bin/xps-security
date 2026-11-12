@@ -98,6 +98,16 @@ test_login() {
     "$B/xps-pamtest" "${1:-$PAM_SERVICE}" "$USER"
 }
 
+# Up to 3 tries, so one mistyped password or code does not end the setup.
+try_test() {
+    local n
+    for n in 1 2 3; do
+        "$B/xps-pamtest" "$1" "$USER" | tee /dev/stderr | grep -q "AUTH OK" && return 0
+        [ "$n" -lt 3 ] && echo "  That did not work. Try again ($n of 3). The first prompt wants your Linux password (the one you type for sudo); a second prompt wants the recovery code."
+    done
+    return 1
+}
+
 enroll() {
     [ -n "$PAMFILE" ] || die "Could not find a supported lock-screen PAM file. Looked for $PAM_DIR/omarchy-lock-password and $PAM_DIR/hyprlock."
     [ -f "$SRC/pam_xps.c" ] && [ -f "$SRC/xps_check.c" ] || die "Security module source files are missing. Run the latest XPS Setup first."
@@ -149,12 +159,12 @@ enroll() {
     make_stack "usbdir=/var/empty" | sudo tee "$PAM_DIR/xps-lock-test" >/dev/null || die "Could not prepare the recovery test stack."
 
     echo
-    echo "  Test A: key plugged in. Type your normal password."
-    "$B/xps-pamtest" xps-lock "$USER" | tee /dev/stderr | grep -q "AUTH OK" || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test A failed (password plus key)."; }
+    echo "  Test A: key plugged in. At \"Password:\" type your Linux password (the same one you type for sudo)."
+    try_test xps-lock || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test A failed (password plus key)."; }
     ok "Password + key works"
     echo
     echo "  Test B: pretending the key is lost. Type your normal password, then your recovery code."
-    "$B/xps-pamtest" xps-lock-test "$USER" | tee /dev/stderr | grep -q "AUTH OK" || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test B failed (password plus recovery code)."; }
+    try_test xps-lock-test || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test B failed (password plus recovery code)."; }
     ok "Password + recovery code works"
 
     say "Step 4 of 4: switching on for $PAM_SERVICE"
