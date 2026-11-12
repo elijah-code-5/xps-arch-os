@@ -301,7 +301,7 @@ fi
 # --- self-check: prove it works, do not just trust the steps above -----------------------------------------------
 say "Checking that everything really works"
 if [ "$DRY" != 1 ]; then
-    for c in gnome-system-monitor kdenlive libreoffice nextcloud ollama wtype yad arduino-cli xps-mode xps-dictate xps-assistant xps-panel xps-shortcuts xps-server-setup xps-doctor xps-security xps-usb-watch xps-power xps-terminal whisper-cli; do
+    for c in gnome-system-monitor kdenlive libreoffice nextcloud ollama wtype yad arduino-cli xps-mode xps-dictate xps-assistant xps-panel xps-shortcuts xps-server-setup xps-doctor xps-security xps-usb-watch xps-power xps-terminal xps-login-lock whisper-cli; do
         command -v "$c" >/dev/null 2>&1 || bad "'$c' is not installed or not found"
     done
     /usr/bin/python3 -c "import tkinter" >/dev/null 2>&1 || bad "The assistant window needs Python's tk, which is missing"

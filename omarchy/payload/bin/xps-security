@@ -85,7 +85,7 @@ disable() {
     [ -n "$PAMFILE" ] || die "No supported lock-screen PAM file exists (looked for omarchy-lock-password and hyprlock)."
     if [ -f "$BACKUP" ]; then sudo cp "$BACKUP" "$PAMFILE" && ok "Original $PAM_SERVICE PAM settings restored"; else echo "  (no XPS backup found; PAM file left unchanged)"; fi
     sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"
-    systemctl --user disable --now xps-usb-watch.service >/dev/null 2>&1
+    systemctl --user disable --now xps-usb-watch.service xps-login-lock.service >/dev/null 2>&1
     ok "USB-key check is off. Password-based lock screen restored."
 }
 
@@ -163,6 +163,7 @@ enroll() {
     systemctl --user daemon-reload
     systemctl --user enable --now xps-usb-watch.service >/dev/null 2>&1 || die "Could not enable the USB removal watcher; restore with xps-security disable."
     systemctl --user restart xps-usb-watch.service >/dev/null 2>&1
+    systemctl --user enable xps-login-lock.service >/dev/null 2>&1 && ok "After each automatic login the screen locks and asks for password + key."
     ok "USB check enabled for the existing $PAM_SERVICE PAM service. Password remains required."
     ok "Removing the enrolled USB storage device locks the session."
     rescue

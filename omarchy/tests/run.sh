@@ -22,6 +22,7 @@ check grep -q '127.0.0.1:11434' payload/bin/xps-assistant
 for mode in 'Arduino / ESP32' 'Linux sysadmin' 'Raspberry Pi' 'Code review' 'Build / debug'; do
     grep -Fq "$mode" payload/bin/xps-assistant || { echo "FAIL: missing assistant mode: $mode"; fail=1; }
 done
+check bash -n payload/bin/xps-login-lock
 check test -s payload/share/device-brief.md
 check grep -q 'device_context' payload/bin/xps-assistant
 if command -v gcc >/dev/null; then

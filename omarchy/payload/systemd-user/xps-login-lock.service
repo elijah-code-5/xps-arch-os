@@ -1,0 +1,11 @@
+[Unit]
+Description=XPS lock the screen right after automatic login (when the USB key lock is set up)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/xps-login-lock
+
+[Install]
+WantedBy=graphical-session.target

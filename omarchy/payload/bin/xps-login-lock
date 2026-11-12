@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Runs once when you sign in: if the USB-key lock is set up, lock the screen right away,
+# so the desktop asks for your password + USB key (or recovery code) after the automatic login.
+CONF=${XPS_CONF:-/etc/xps-security/xps.conf}
+[ -r "$CONF" ] || exit 0
+grep -q '^usb_id=.' "$CONF" || exit 0
+grep -qs pam_xps /etc/pam.d/omarchy-lock-password /etc/pam.d/hyprlock || exit 0   # only if the lock really uses it
+sleep "${XPS_LOGIN_LOCK_DELAY:-3}"
+if command -v omarchy-lock-screen >/dev/null 2>&1; then exec omarchy-lock-screen; fi
+exec loginctl lock-session
