@@ -109,7 +109,7 @@ fi
 say "Updating the system (this is the long part)"
 UPDATED=1
 if [ "$DRY" = 1 ]; then echo "  [dry-run] sudo pacman -Syu --noconfirm"
-elif ! sudo pacman -Syu --noconfirm; then
+elif ! sudo env OMARCHY_ALLOW_DIRECT_PACMAN=1 pacman -Syu --noconfirm; then
     UPDATED=0
     bad "System update failed, so no programs were installed. Check the internet and run this app again."
 fi
@@ -138,13 +138,13 @@ if [ "$UPDATED" = 1 ]; then
     done
     [ ${#MISSING[@]} -gt 0 ] && note "Not available right now, skipped: ${MISSING[*]}"
     if [ "$DRY" = 1 ]; then echo "  [dry-run] sudo pacman -S --needed --noconfirm ${AVAIL[*]}"
-    elif sudo pacman -S --needed --noconfirm "${AVAIL[@]}"; then ok "Programs installed"
+    elif sudo env OMARCHY_ALLOW_DIRECT_PACMAN=1 pacman -S --needed --noconfirm "${AVAIL[@]}"; then ok "Programs installed"
     else
         note "One program failed. Trying them one by one..."
-        for p in "${AVAIL[@]}"; do sudo pacman -S --needed --noconfirm "$p" >/dev/null 2>&1 || bad "Could not install $p"; done
+        for p in "${AVAIL[@]}"; do sudo env OMARCHY_ALLOW_DIRECT_PACMAN=1 pacman -S --needed --noconfirm "$p" >/dev/null 2>&1 || bad "Could not install $p"; done
     fi
     if ! command -v code >/dev/null 2>&1 && [ "$DRY" != 1 ]; then
-        sudo pacman -S --needed --noconfirm code >/dev/null 2>&1 && ok "VS Code installed" || note "VS Code not installed (Omarchy can add it from its menu: Install > Editor)."
+        sudo env OMARCHY_ALLOW_DIRECT_PACMAN=1 pacman -S --needed --noconfirm code >/dev/null 2>&1 && ok "VS Code installed" || note "VS Code not installed (Omarchy can add it from its menu: Install > Editor)."
     fi
 fi
 
