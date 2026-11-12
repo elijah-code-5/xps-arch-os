@@ -128,7 +128,7 @@ PKGS=(
     # memory safety
     zram-generator earlyoom
     # battery and heat on this laptop, lock-screen module build
-    thermald power-profiles-daemon pam
+    thermald pam
 )
 if [ "$UPDATED" = 1 ]; then
     say "Installing programs"
@@ -212,7 +212,8 @@ if [ "$DRY" != 1 ]; then
     command -v xps-mode >/dev/null 2>&1 && xps-mode auto >/dev/null 2>&1
     systemctl --user enable --now xps-power.timer >/dev/null 2>&1 && ok "Battery saver: power-saver on battery, balanced when plugged in" || bad "Battery saver timer did not start"
     systemctl --user enable --now xps-usb-watch.service >/dev/null 2>&1 || bad "USB key watcher did not start"
-    sudo systemctl enable --now thermald.service power-profiles-daemon.service >/dev/null 2>&1 || note "Heat/power services could not be enabled (Omarchy may manage them)."
+    sudo systemctl enable --now thermald.service >/dev/null 2>&1 || note "Heat control (thermald) could not be enabled."
+    command -v powerprofilesctl >/dev/null 2>&1 || note "No power-profile service found; Omarchy normally provides it, so battery switching may do nothing."
 fi
 ok "Menu entries added (press Super+Space and type: XPS, Task, Assistant, Voice...)"
 
