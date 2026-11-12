@@ -65,10 +65,12 @@ status() {
 }
 
 make_stack() { # $1 = extra module arguments
-    local last
-    last=$(grep -n '^auth' "$BACKUP" | tail -1 | cut -d: -f1)
-    [ -n "$last" ] || return 1
-    awk -v last="$last" -v args="$1" 'NR==last{print; print "auth       required     pam_xps.so " args; next} {print}' "$BACKUP"
+    # A fixed, simple stack (password, then the USB/recovery check). It does not copy Omarchy's own
+    # file, because that file's exact layout varies and a guessed edit can make the password fail.
+    printf '%s\n' "# written by xps-security; original saved as $BACKUP" \
+        "auth       required     pam_unix.so" \
+        "auth       required     pam_xps.so $1" \
+        "account    required     pam_unix.so"
 }
 
 build() {
@@ -139,7 +141,7 @@ enroll() {
     unset c1 c2
 
     sudo install -d -m755 /etc/xps-security || die "Could not create the settings folder."
-    printf 'usb_id=%s\ncode_hash=%s\n' "$id" "$hash" | sudo tee "$CONF.new" >/dev/null && sudo chmod 600 "$CONF.new" && sudo mv "$CONF.new" "$CONF" || die "Could not save the settings."
+    printf 'usb_id=%s\ncode_hash=%s\n' "$id" "$hash" | sudo tee "$CONF.new" >/dev/null && sudo chmod 644 "$CONF.new" && sudo mv "$CONF.new" "$CONF" || die "Could not save the settings."
     sudo install -Dm644 "$B/pam_xps.so" "$MOD" || die "Could not install the security module."
     [ -f "$BACKUP" ] || sudo cp -a "$PAMFILE" "$BACKUP" || die "Could not back up the lock-screen settings."
 
@@ -148,11 +150,11 @@ enroll() {
 
     echo
     echo "  Test A: key plugged in. Type your normal password."
-    "$B/xps-pamtest" xps-lock "$USER" | grep -q "AUTH OK" || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test A failed (password plus key)."; }
+    "$B/xps-pamtest" xps-lock "$USER" | tee /dev/stderr | grep -q "AUTH OK" || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test A failed (password plus key)."; }
     ok "Password + key works"
     echo
     echo "  Test B: pretending the key is lost. Type your normal password, then your recovery code."
-    "$B/xps-pamtest" xps-lock-test "$USER" | grep -q "AUTH OK" || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test B failed (password plus recovery code)."; }
+    "$B/xps-pamtest" xps-lock-test "$USER" | tee /dev/stderr | grep -q "AUTH OK" || { sudo rm -f "$PAM_DIR/xps-lock" "$PAM_DIR/xps-lock-test"; die "Test B failed (password plus recovery code)."; }
     ok "Password + recovery code works"
 
     say "Step 4 of 4: switching on for $PAM_SERVICE"
