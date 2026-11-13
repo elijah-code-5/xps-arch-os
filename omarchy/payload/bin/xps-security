@@ -94,9 +94,13 @@ setup_pamusb() {
     command -v pamusb-conf >/dev/null 2>&1 || die "pam_usb installed but its setup tool (pamusb-conf) is missing."
     sudo systemctl enable --now udisks2.service >/dev/null 2>&1
     echo "  Teaching pam_usb about your stick. If it asks which volume, choose the one for your stick."
-    sudo pamusb-conf --add-device xps-key || die "pam_usb could not register the stick."
-    sudo pamusb-conf --add-user "$USER" || die "pam_usb could not register your user."
-    pamusb-check "$USER" || die "pam_usb does not recognise the stick (keep it plugged in and try again)."
+    local pc=/etc/security/pam_usb.conf
+    # Safe to run again: skip what an earlier run already registered.
+    if sudo grep -q 'device id="xps-key"' "$pc" 2>/dev/null; then ok "Your stick is already registered with pam_usb"
+    else sudo pamusb-conf --add-device xps-key || die "pam_usb could not register the stick."; fi
+    if sudo grep -q "user id=\"$USER\"" "$pc" 2>/dev/null; then ok "Your user is already registered with pam_usb"
+    else sudo pamusb-conf --add-user "$USER" || die "pam_usb could not register your user."; fi
+    pamusb-check "$USER" || die "pam_usb does not recognise the stick. Keep it plugged in. If you changed or reformatted it, run: sudo pamusb-conf --reset-pads=$USER"
     ok "pam_usb recognises your stick"
 }
 
