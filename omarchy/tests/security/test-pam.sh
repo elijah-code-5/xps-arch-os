@@ -65,4 +65,23 @@ t "camera hangs + wrong code: refused"          t-face-hang "0405;1111" 1
 printf 'auth required pam_unix.so\nauth required pam_xps.so usbdir=%s facecmd=/nonexistent/xps-face\naccount required pam_unix.so\n' "$B/usb" > /etc/pam.d/t-face-missing
 t "face program missing: code fallback"         t-face-missing "0405;2059" 0
 t "face program missing + wrong code: refused"  t-face-missing "0405;0000" 1
+# --- pam_usb layout (the real stack text from xps-security; pam_permit / pam_deny stand in for pam_usb) ---
+BACKUP=/etc/pam.d/orig
+eval "$(sed -n '/^make_stack_pamusb() {/,/^}/p' "$SRC/../bin/xps-security")"
+mk() { make_stack_pamusb "$B/face-$2" | sed "s#pam_usb.so#$1#; s#pam_xps.so usbdir=/var/empty#pam_xps.so usbdir=/var/empty#" > "/etc/pam.d/$3"; }
+mk pam_permit.so ok  u-ok-ok     # stick ok, face ok
+mk pam_permit.so no  u-ok-no     # stick ok, face not ok
+mk pam_deny.so   ok  u-no-ok     # stick not ok
+# face on (config already has face=1)
+t "pam_usb: stick ok + face ok + password"        u-ok-ok "0405"      0
+t "pam_usb: stick ok + face ok + wrong password"  u-ok-ok "9999"      1
+t "pam_usb: stick ok, face no -> asks code, right" u-ok-no "0405;2059" 0
+t "pam_usb: stick ok, face no -> wrong code"       u-ok-no "0405;1111" 1
+t "pam_usb: stick not ok -> right code"            u-no-ok "0405;2059" 0
+t "pam_usb: stick not ok -> wrong code"            u-no-ok "0405;1111" 1
+t "pam_usb: wrong password, stick+face ok"         u-no-ok "9999;2059" 1
+# face off: stick ok alone is enough with the password
+sed -i '/^face=/d' /etc/xps-security/xps.conf
+t "pam_usb, face off: stick ok + password"         u-ok-no "0405"      0
+t "pam_usb, face off: stick not ok, wrong code"    u-no-ok "0405;1111" 1
 exit $fail

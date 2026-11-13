@@ -56,11 +56,14 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     const char *cfg = "/etc/xps-security/xps.conf";
     const char *usbdir = "/dev/disk/by-id";
     const char *facecmd = "/usr/local/bin/xps-face";
+    int facemode = 0;
     for (int i = 0; i < argc; i++) {
         if (!strncmp(argv[i], "config=", 7))
             cfg = argv[i] + 7;
         else if (!strncmp(argv[i], "usbdir=", 7))
             usbdir = argv[i] + 7;
+        else if (!strcmp(argv[i], "mode=face"))
+            facemode = 1;
         else if (!strncmp(argv[i], "facecmd=", 8))
             facecmd = argv[i] + 8;
     }
@@ -73,6 +76,10 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         pam_syslog(pamh, LOG_ERR, "xps: security config is unreadable or invalid");
         return PAM_AUTH_ERR;
     }
+
+    /* mode=face: the stick was already checked by another module (pam_usb). Only the face is decided here. */
+    if (facemode)
+        return (!c.face || face_ok(facecmd)) ? PAM_SUCCESS : PAM_AUTH_ERR;
 
     const char *why = "USB key not found. Recovery code: ";
     if (xps_usb_present(usbdir, c.usb_id)) {

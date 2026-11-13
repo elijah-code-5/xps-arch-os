@@ -74,12 +74,15 @@ make_stack() { # $1 = extra module arguments
         "account    required     pam_unix.so"
 }
 
-make_stack_pamusb() {
-    # password first; then the stick is checked by pam_usb; if pam_usb does not accept it,
-    # the recovery code is asked (pam_xps pointed at an empty folder always asks for the code).
+make_stack_pamusb() { # $1 = optional face program (tests only)
+    # 1. password. 2. pam_usb checks the stick: if it fails, jump to the recovery code.
+    # 3. stick ok -> face check (passes automatically when the face check is off): if it passes, skip the code.
+    # 4. recovery code (pam_xps pointed at an empty folder always asks for it).
+    local fc=""; [ -n "${1:-}" ] && fc=" facecmd=$1"
     printf '%s\n' "# written by xps-security (pam_usb mode); original saved as $BACKUP" \
         "auth       required     pam_unix.so" \
-        "auth       sufficient   pam_usb.so" \
+        "auth       [success=ok default=1]    pam_usb.so" \
+        "auth       [success=1 default=ignore] pam_xps.so mode=face$fc" \
         "auth       required     pam_xps.so usbdir=/var/empty" \
         "account    required     pam_unix.so"
 }
@@ -216,9 +219,8 @@ enroll() {
 }
 
 face_on() {
-    say "Adding the face check (only works with the built-in USB check, not pam_usb mode)"
+    say "Adding the face check"
     [ -f "$CONF" ] || die "Set up the USB key first (Security setup), then add the face check."
-    grep -q pam_usb "$PAMFILE" 2>/dev/null && die "The face check works with the built-in USB check. Run Security setup (USB key) first to switch to it."
     command -v xps-face >/dev/null || die "xps-face is missing. Run the XPS Setup app again."
     xps-face status | grep -q "Models present: yes" || die "The face models are missing. Run the XPS Setup app again (it downloads them)."
     echo "  Step 1: your face. Sit in normal light, look at the camera."
@@ -226,6 +228,16 @@ face_on() {
     xps-face enroll || die "Could not save your face."
     echo "  Step 2: test. Keep looking at the camera."
     xps-face verify && ok "The camera recognises you" || die "The camera did not recognise you. Try again in better light."
+    if grep -q pam_usb "$PAMFILE" 2>/dev/null && ! grep -q 'mode=face' "$PAMFILE"; then
+        echo "  Updating the pam_usb lock layout to include the face step..."
+        build || die "Could not build the security module."
+        sudo install -Dm644 "$B/pam_xps.so" "$MOD" || die "Could not update the security module."
+        make_stack_pamusb | sudo tee "$PAM_DIR/xps-lock" >/dev/null || die "Could not prepare the layout."
+        echo "  Test: type your Linux password, then keep looking at the camera."
+        sudo sed -i '/^face=/d' "$CONF"; echo "face=1" | sudo tee -a "$CONF" >/dev/null
+        try_test xps-lock || { sudo sed -i '/^face=/d' "$CONF"; sudo rm -f "$PAM_DIR/xps-lock"; die "The new layout failed its test."; }
+        sudo cp "$PAM_DIR/xps-lock" "$PAMFILE" && sudo rm -f "$PAM_DIR/xps-lock" || die "Could not switch the lock screen over."
+    fi
     sudo sed -i '/^face=/d' "$CONF" && echo "face=1" | sudo tee -a "$CONF" >/dev/null || die "Could not save the setting."
     ok "Face check is on: with the key plugged in, your face must also match. Without a match, the recovery code is asked."
     echo "  Turn it off any time: xps-security face-off"
