@@ -73,6 +73,32 @@ make_stack() { # $1 = extra module arguments
         "account    required     pam_unix.so"
 }
 
+make_stack_pamusb() {
+    # password first; then the stick is checked by pam_usb; if pam_usb does not accept it,
+    # the recovery code is asked (pam_xps pointed at an empty folder always asks for the code).
+    printf '%s\n' "# written by xps-security (pam_usb mode); original saved as $BACKUP" \
+        "auth       required     pam_unix.so" \
+        "auth       sufficient   pam_usb.so" \
+        "auth       required     pam_xps.so usbdir=/var/empty" \
+        "account    required     pam_unix.so"
+}
+
+setup_pamusb() {
+    say "Installing pam_usb (the community USB login module)"
+    if ! command -v pamusb-check >/dev/null 2>&1; then
+        local helper=""; command -v yay >/dev/null 2>&1 && helper=yay; [ -z "$helper" ] && command -v paru >/dev/null 2>&1 && helper=paru
+        [ -n "$helper" ] || die "I need the AUR helper (yay) that Omarchy normally includes, and it was not found."
+        "$helper" -S --needed --noconfirm pam_usb || die "pam_usb did not install from the Arch user repository."
+    fi
+    command -v pamusb-conf >/dev/null 2>&1 || die "pam_usb installed but its setup tool (pamusb-conf) is missing."
+    sudo systemctl enable --now udisks2.service >/dev/null 2>&1
+    echo "  Teaching pam_usb about your stick. If it asks which volume, choose the one for your stick."
+    sudo pamusb-conf --add-device xps-key || die "pam_usb could not register the stick."
+    sudo pamusb-conf --add-user "$USER" || die "pam_usb could not register your user."
+    pamusb-check "$USER" || die "pam_usb does not recognise the stick (keep it plugged in and try again)."
+    ok "pam_usb recognises your stick"
+}
+
 build() {
     B=$(mktemp -d)
     gcc -O2 -Wall -shared -fPIC -I"$SRC" -o "$B/pam_xps.so" "$SRC/pam_xps.c" "$SRC/xps_check.c" -lpam -lcrypt || return 1
@@ -155,7 +181,12 @@ enroll() {
     sudo install -Dm644 "$B/pam_xps.so" "$MOD" || die "Could not install the security module."
     [ -f "$BACKUP" ] || sudo cp -a "$PAMFILE" "$BACKUP" || die "Could not back up the lock-screen settings."
 
-    make_stack "" | sudo tee "$PAM_DIR/xps-lock" >/dev/null || die "The lock-screen PAM layout is unexpected; original settings are unchanged."
+    if [ "${XPS_MODE:-own}" = pamusb ]; then
+        setup_pamusb
+        make_stack_pamusb | sudo tee "$PAM_DIR/xps-lock" >/dev/null || die "Could not prepare the pam_usb lock layout."
+    else
+        make_stack "" | sudo tee "$PAM_DIR/xps-lock" >/dev/null || die "Could not prepare the lock layout."
+    fi
     make_stack "usbdir=/var/empty" | sudo tee "$PAM_DIR/xps-lock-test" >/dev/null || die "Could not prepare the recovery test stack."
 
     echo
@@ -181,10 +212,11 @@ enroll() {
 
 case "${1:-}" in
     enroll)  enroll ;;
+    enroll-pamusb) XPS_MODE=pamusb; enroll ;;
     status)  status ;;
     test)    test_login "${2:-}" ;;
     disable) disable ;;
-    *) echo "usage: xps-security enroll | status | test [pam-service] | disable"; exit 1 ;;
+    *) echo "usage: xps-security enroll | enroll-pamusb | status | test [pam-service] | disable"; exit 1 ;;
 esac
-[ "${1:-}" = enroll ] || [ "${1:-}" = disable ] && { [ -t 0 ] && read -r -p "Press Enter to close. " _; }
+[ "${1:-}" = enroll ] || [ "${1:-}" = enroll-pamusb ] || [ "${1:-}" = disable ] && { [ -t 0 ] && read -r -p "Press Enter to close. " _; }
 exit 0

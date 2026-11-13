@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Security setup with pam_usb
+Comment=USB key login using the community pam_usb module (plus recovery code)
+Exec=xps-terminal xps-security enroll-pamusb
+Icon=system-lock-screen
+Categories=Settings;Security;
