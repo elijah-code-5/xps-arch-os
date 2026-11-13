@@ -39,6 +39,13 @@ grep -q '"on-click": "minimize-raise"' payload/taskbar/xps-taskbar.jsonc && echo
 grep -q 'xps-apps' payload/taskbar/xps-taskbar.jsonc && echo "PASS: taskbar Apps button uses launcher fallback" || { echo "FAIL: taskbar Apps launcher missing"; fail=1; }
 grep -q 'omarchy update' payload/bin/xps-update && echo "PASS: update button calls Omarchy updater" || { echo "FAIL: safe Omarchy update action missing"; fail=1; }
 
+# Lock-screen PAM service detection
+hl=$(mktemp -d); printf 'auth {\n  pam {\n    module = custom-lock\n  }\n}\n' > "$hl/a.conf"; printf 'general {}\n' > "$hl/b.conf"
+got=$(XPS_HYPRLOCK_CONF="$hl/a.conf" HOME="$hl" bash -c 'source <(sed -n "/^hyprlock_module() {/,/^}/p" payload/bin/xps-security); hyprlock_module')
+[ "$got" = custom-lock ] && echo "PASS: detects hyprlock PAM module" || { echo "FAIL: detect module ($got)"; fail=1; }
+got=$(XPS_HYPRLOCK_CONF="$hl/b.conf" HOME="$hl" bash -c 'source <(sed -n "/^hyprlock_module() {/,/^}/p" payload/bin/xps-security); hyprlock_module')
+[ -z "$got" ] && echo "PASS: no module named -> fallback" || { echo "FAIL: fallback ($got)"; fail=1; }
+
 # Mode schedule: weekday, weekend, and edges
 T=$(mktemp -d); export HOME="$T/home"; mkdir -p "$HOME/.config/xps-modes"
 cp payload/schedule.conf "$HOME/.config/xps-modes/schedule.conf"

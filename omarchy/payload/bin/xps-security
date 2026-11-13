@@ -11,15 +11,24 @@ CONF=${XPS_CONF:-/etc/xps-security/xps.conf}
 PAM_DIR=${XPS_PAM_DIR:-/etc/pam.d}
 MOD=${XPS_PAM_MODULE:-/usr/lib/security/pam_xps.so}
 
-# Omarchy calls its lock-screen PAM service omarchy-lock-password. Older/custom
-# Hyprlock setups may instead provide a dedicated hyprlock service. Only touch a
-# PAM stack that already exists; never create a guessed service file.
-if [ -f "$PAM_DIR/omarchy-lock-password" ]; then
+# Find which PAM service the lock screen (hyprlock) really uses. If we changed a different file,
+# the lock would keep asking only for the password. Look at hyprlock's own settings first.
+hyprlock_module() {
+    local f m
+    for f in "${XPS_HYPRLOCK_CONF:-$HOME/.config/hypr/hyprlock.conf}" "$HOME/.local/share/omarchy/config/hypr/hyprlock.conf"; do
+        [ -f "$f" ] || continue
+        m=$(grep -E '^[[:space:]]*(auth:pam:)?module[[:space:]]*=' "$f" | head -1 | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*$//')
+        [ -n "$m" ] && { echo "$m"; return; }
+    done
+}
+PAMFILE=""
+mod=$(hyprlock_module)
+if [ -n "$mod" ] && [ -f "$PAM_DIR/$mod" ]; then
+    PAMFILE="$PAM_DIR/$mod"
+elif [ -f "$PAM_DIR/omarchy-lock-password" ]; then
     PAMFILE="$PAM_DIR/omarchy-lock-password"
 elif [ -f "$PAM_DIR/hyprlock" ]; then
     PAMFILE="$PAM_DIR/hyprlock"
-else
-    PAMFILE=""
 fi
 if [ -n "$PAMFILE" ]; then
     PAM_SERVICE=${PAMFILE##*/}
