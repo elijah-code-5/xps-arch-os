@@ -1,0 +1,181 @@
+#!/usr/bin/python3
+"""xps-face: a small offline face check (OpenCV YuNet finds the face, SFace compares it).
+
+  xps-face enroll            look at the camera; saves your face
+  xps-face enroll PHOTO...   save your face from one or more photos instead
+  xps-face verify            exit 0 if the camera sees you, 1 if not, 2 if the camera or models fail
+  xps-face status | remove
+
+Nothing leaves the laptop. Only numbers describing your face are stored, not pictures.
+Honest limit: a normal webcam cannot tell a real face from a good photo of it. It is one extra
+factor, not a replacement for the password or the USB key.
+"""
+import json
+import os
+import pwd
+import sys
+import time
+
+THRESHOLD = float(os.environ.get("XPS_FACE_THRESHOLD", "0.45"))   # library default for "same person" is 0.363
+NEEDED = 3            # good frames required to accept
+VERIFY_SECONDS = 8
+ENROLL_FRAMES = 15
+
+
+def home():
+    return os.environ.get("HOME") or pwd.getpwuid(os.getuid()).pw_dir
+
+
+DATA = os.path.join(home(), ".local/share/xps-face")
+MODELS = os.path.join(home(), ".local/share/xps-models/face")
+FEATURES = os.path.join(DATA, "features.json")
+DETECTOR = os.path.join(MODELS, "yunet.onnx")
+RECOGNIZER = os.path.join(MODELS, "sface.onnx")
+
+
+def load_cv():
+    import cv2  # imported late so "status" works even without OpenCV
+    return cv2
+
+
+class Engine:
+    def __init__(self):
+        self.cv = load_cv()
+        for need in (DETECTOR, RECOGNIZER):
+            if not os.path.isfile(need):
+                raise RuntimeError("face model missing: " + need)
+        self.det = self.cv.FaceDetectorYN.create(DETECTOR, "", (320, 320), 0.9, 0.3, 5000)
+        self.rec = self.cv.FaceRecognizerSF.create(RECOGNIZER, "")
+
+    def feature(self, frame):
+        """128 numbers describing the largest face in the frame, or None if there is no face."""
+        h, w = frame.shape[:2]
+        self.det.setInputSize((w, h))
+        _, faces = self.det.detect(frame)
+        if faces is None or len(faces) == 0:
+            return None
+        face = max(faces, key=lambda f: f[2] * f[3])
+        return self.rec.feature(self.rec.alignCrop(frame, face))
+
+    def score(self, a, b):
+        return float(self.rec.match(a, b, self.cv.FaceRecognizerSF_FR_COSINE))
+
+
+def open_camera(cv2):
+    for idx in (0, 1, 2):
+        cap = cv2.VideoCapture(idx)
+        if cap.isOpened():
+            for _ in range(5):          # let the exposure settle
+                cap.read()
+            return cap
+        cap.release()
+    return None
+
+
+def load_saved():
+    with open(FEATURES) as fh:
+        return json.load(fh)
+
+
+def best_score(engine, np, saved, feat):
+    return max(engine.score(np.array([s], dtype="float32"), feat) for s in saved)
+
+
+def verify(engine=None, cap=None):
+    try:
+        import numpy as np
+        saved = load_saved()
+        engine = engine or Engine()
+    except Exception as e:
+        print("not ready:", e, file=sys.stderr)
+        return 2
+    cv2 = engine.cv
+    cap = cap or open_camera(cv2)
+    if cap is None:
+        print("no camera", file=sys.stderr)
+        return 2
+    good = 0
+    end = time.time() + VERIFY_SECONDS
+    try:
+        while time.time() < end:
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            feat = engine.feature(frame)
+            if feat is None:
+                continue
+            if best_score(engine, np, saved, feat) >= THRESHOLD:
+                good += 1
+                if good >= NEEDED:
+                    return 0
+    finally:
+        cap.release()
+    return 1
+
+
+def enroll(photos):
+    import numpy as np
+    engine = Engine()
+    cv2 = engine.cv
+    feats = []
+    if photos:
+        for path in photos:
+            img = cv2.imread(path)
+            if img is None:
+                print("  could not open", path)
+                continue
+            f = engine.feature(img)
+            if f is None:
+                print("  no face found in", path)
+                continue
+            feats.append(f[0].tolist())
+    else:
+        cap = open_camera(cv2)
+        if cap is None:
+            print("  No camera found.")
+            return 2
+        print("  Look at the camera. Turn your head slightly left and right. Capturing...")
+        end = time.time() + 20
+        while time.time() < end and len(feats) < ENROLL_FRAMES:
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            f = engine.feature(frame)
+            if f is not None:
+                feats.append(f[0].tolist())
+                time.sleep(0.4)
+        cap.release()
+    if len(feats) < (1 if photos else 8):
+        print("  Not enough clear face pictures (%d). Try again with better light." % len(feats))
+        return 1
+    os.makedirs(DATA, mode=0o700, exist_ok=True)
+    with open(FEATURES, "w") as fh:
+        json.dump(feats, fh)
+    os.chmod(FEATURES, 0o600)
+    print("  Saved your face (%d samples)." % len(feats))
+    return 0
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "status"
+    if cmd == "verify":
+        return verify()
+    if cmd == "enroll":
+        return enroll(argv[2:])
+    if cmd == "remove":
+        try:
+            os.remove(FEATURES)
+        except FileNotFoundError:
+            pass
+        print("Face data removed.")
+        return 0
+    if cmd == "status":
+        print("Face saved: " + ("yes" if os.path.isfile(FEATURES) else "no"))
+        print("Models present: " + ("yes" if os.path.isfile(DETECTOR) and os.path.isfile(RECOGNIZER) else "no"))
+        return 0
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

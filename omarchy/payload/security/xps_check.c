@@ -35,6 +35,8 @@ int xps_load_config(const char *path, struct xps_conf *c)
         if (!strcmp(k, "usb_id") && strlen(v) > 0 && strlen(v) < sizeof c->usb_id) {
             strcpy(c->usb_id, v);
             have_usb = 1;
+        } else if (!strcmp(k, "face")) {
+            c->face = !strcmp(v, "1");
         } else if (!strcmp(k, "code_hash") && strlen(v) > 0 && strlen(v) < sizeof c->code_hash) {
             strcpy(c->code_hash, v);
             have_hash = 1;

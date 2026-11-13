@@ -18,7 +18,7 @@ report() {
     have code "VS Code"
     echo
     echo "MY TOOLS"
-    for t in xps-panel xps-dictate xps-assistant xps-mode xps-security xps-usb-watch xps-power; do have "$t" "$t"; done
+    for t in xps-panel xps-dictate xps-assistant xps-mode xps-security xps-usb-watch xps-power xps-face; do have "$t" "$t"; done
     echo
     echo "TASKBAR"
     if systemctl --user is-active --quiet xps-taskbar.service 2>/dev/null; then ok "Taskbar is running"
@@ -42,6 +42,9 @@ report() {
     echo
     echo "SECURITY (password + USB key, recovery code if the key is lost)"
     if command -v xps-security >/dev/null 2>&1; then xps-security status 2>&1 | sed 's/^/  /'; else no "Security tool missing"; fi
+    if systemctl --user is-active --quiet xps-usb-watch.service 2>/dev/null; then ok "USB removal watcher is running"
+    else no "USB removal watcher is NOT running (so pulling the key locks nothing). Last messages:"; journalctl --user -u xps-usb-watch.service -n 6 --no-pager 2>/dev/null | sed 's/^/           /'; fi
+    echo "  Face: $(xps-face status 2>/dev/null | tr '\n' ' ')"
     echo
     echo "MODES AND BATTERY"
     command -v xps-mode >/dev/null && echo "  Right now the clock says: $(xps-mode pick)"

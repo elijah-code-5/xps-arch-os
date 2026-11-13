@@ -42,6 +42,12 @@ int main(int argc, char **argv)
     CHECK(strcmp(c.usb_id, "usb-Test_Stick_123-0:0") == 0);
     CHECK(xps_code_ok(c.code_hash, "2468") == 1);
 
+    CHECK(c.face == 0);                                          /* face check is off unless asked for */
+    f = fopen(path, "a"); fputs("face=1\n", f); fclose(f);
+    CHECK(xps_load_config(path, &c) == 0 && c.face == 1);
+    f = fopen(path, "a"); fputs("face=0\n", f); fclose(f);
+    CHECK(xps_load_config(path, &c) == 0 && c.face == 0);       /* last setting wins */
+
     /* usb presence */
     snprintf(link, sizeof link, "%s/usb-Test_Stick_123-0:0", dir);
     unlink(link);

@@ -4,6 +4,7 @@
 
 struct xps_conf {
     char usb_id[256];     /* name of the stick in /dev/disk/by-id, e.g. usb-SanDisk_Ultra_4C53...-0:0 */
+    int face;             /* 1 = also require the face check while the stick is plugged in */
     char code_hash[256];  /* salted hash of the recovery code (never the code itself) */
 };
 

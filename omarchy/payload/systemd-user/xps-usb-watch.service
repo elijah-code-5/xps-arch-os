@@ -1,6 +1,7 @@
 [Unit]
 Description=XPS lock screen when the USB key is pulled out
 After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 ExecStart=/usr/local/bin/xps-usb-watch
@@ -8,4 +9,4 @@ Restart=always
 RestartSec=3
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target

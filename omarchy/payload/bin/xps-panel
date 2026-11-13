@@ -17,5 +17,7 @@ exec yad --title="XPS Control Panel" --center --width=560 --borders=14 \
     --field="Security setup (USB key)!security-high:FBTN" "xps-terminal xps-security enroll &" \
     --field="Security status!dialog-information:FBTN" "xps-terminal xps-security status &" \
     --field="Update Omarchy!system-software-update:FBTN" "xps-update &" \
+    --field="Test USB lock now!system-lock-screen:FBTN" "xps-usb-watch --test &" \
+    --field="Add face check!camera-web:FBTN" "xps-terminal xps-security face-on &" \
     --field="Check everything!dialog-ok:FBTN" "xps-doctor &" \
     --field="Lock screen!system-lock-screen:FBTN" "omarchy-lock-screen &"

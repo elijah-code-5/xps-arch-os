@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Add face check
+Comment=Teach the laptop your face (offline) and require it with the USB key
+Exec=xps-terminal xps-security face-on
+Icon=camera-web
+Categories=Settings;Security;

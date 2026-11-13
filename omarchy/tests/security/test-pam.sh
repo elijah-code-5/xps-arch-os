@@ -48,4 +48,21 @@ mv /etc/xps-security/xps.conf "$B/conf.bak"
 t "not set up: password alone works"    t-nousb "0405"      0
 printf 'garbage\n' > /etc/xps-security/xps.conf
 t "broken config: refuses (safe)"       t-nousb "0405;2059" 1
+# --- face check (as a second condition while the stick is in) ---
+mv "$B/conf.bak" /etc/xps-security/xps.conf 2>/dev/null || printf 'usb_id=usb-TestStick_123-0:0\ncode_hash=%s\n' "$HASH" > /etc/xps-security/xps.conf
+echo "face=1" >> /etc/xps-security/xps.conf; chmod 644 /etc/xps-security/xps.conf
+printf '#!/bin/sh\nexit 0\n' > "$B/face-ok"; printf '#!/bin/sh\nexit 1\n' > "$B/face-no"; printf '#!/bin/sh\nsleep 60\n' > "$B/face-hang"
+chmod 755 "$B"/face-*
+for v in ok no hang; do
+    printf 'auth required pam_unix.so\nauth required pam_xps.so usbdir=%s facecmd=%s\naccount required pam_unix.so\n' "$B/usb" "$B/face-$v" > /etc/pam.d/t-face-$v
+done
+t "face ok + stick in: password is enough"      t-face-ok   "0405"      0
+t "face NOT ok + stick in: asks recovery code"  t-face-no   "0405;2059" 0
+t "face NOT ok + wrong code: refused"           t-face-no   "0405;1111" 1
+t "face NOT ok + no code: refused"              t-face-no   "0405;"     1
+t "camera hangs: gives up, then code works"     t-face-hang "0405;2059" 0
+t "camera hangs + wrong code: refused"          t-face-hang "0405;1111" 1
+printf 'auth required pam_unix.so\nauth required pam_xps.so usbdir=%s facecmd=/nonexistent/xps-face\naccount required pam_unix.so\n' "$B/usb" > /etc/pam.d/t-face-missing
+t "face program missing: code fallback"         t-face-missing "0405;2059" 0
+t "face program missing + wrong code: refused"  t-face-missing "0405;0000" 1
 exit $fail

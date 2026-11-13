@@ -23,6 +23,8 @@ for mode in 'Arduino / ESP32' 'Linux sysadmin' 'Raspberry Pi' 'Code review' 'Bui
     grep -Fq "$mode" payload/bin/xps-assistant || { echo "FAIL: missing assistant mode: $mode"; fail=1; }
 done
 check bash -n payload/bin/xps-login-lock
+check python3 -m py_compile payload/bin/xps-face
+check python3 -I tests/face/test_face.py "$PWD/payload/bin/xps-face"
 check test -s payload/share/device-brief.md
 check grep -q 'device_context' payload/bin/xps-assistant
 if command -v gcc >/dev/null; then

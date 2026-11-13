@@ -1,20 +1,50 @@
 #!/bin/bash
 # Locks the screen the moment your enrolled USB key is pulled out.
+#   xps-usb-watch           run the watcher (the background service does this)
+#   xps-usb-watch --test    lock the screen right now, the same way a key removal would
 conf="${XPS_CONF:-/etc/xps-security/xps.conf}"
 dir="${XPS_USBDIR:-/dev/disk/by-id}"
 poll="${XPS_POLL:-2}"
+uid=$(id -u)
+log() { logger -t xps-usb-watch "$*" 2>/dev/null; echo "xps-usb-watch: $*" >&2; }
+
+# A background service does not inherit the desktop's settings. Find them, otherwise the lock screen
+# cannot connect to the display and silently does nothing.
+fix_env() {
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$uid}"
+    if [ -z "$WAYLAND_DISPLAY" ]; then
+        s=$(ls "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | grep -v '\.lock$' | head -1)
+        [ -n "$s" ] && export WAYLAND_DISPLAY=$(basename "$s")
+    fi
+    if [ -z "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+        s=$(ls -d "$XDG_RUNTIME_DIR"/hypr/*/ 2>/dev/null | head -1)
+        [ -n "$s" ] && export HYPRLAND_INSTANCE_SIGNATURE=$(basename "$s")
+    fi
+    export PATH="$HOME/.local/share/omarchy/bin:/usr/local/bin:/usr/bin:$PATH"
+}
+
+locked() { pidof hyprlock >/dev/null 2>&1; }
+lock_now() {
+    if [ -n "$XPS_LOCK_CMD" ]; then eval "$XPS_LOCK_CMD"; return; fi
+    fix_env
+    if command -v omarchy-lock-screen >/dev/null 2>&1; then
+        log "locking with omarchy-lock-screen"; omarchy-lock-screen >/dev/null 2>&1 & sleep 2; locked && return
+    fi
+    if command -v hyprlock >/dev/null 2>&1; then
+        log "locking with hyprlock directly"; hyprlock >/dev/null 2>&1 & sleep 2; locked && return
+    fi
+    log "locking with loginctl lock-session"; loginctl lock-session
+}
+
+[ "$1" = "--test" ] && { lock_now; exit 0; }
+
 id=$(sed -n 's/^usb_id=//p' "$conf" 2>/dev/null | head -1)
 [ -n "$id" ] || exit 0          # not set up: nothing to watch
 
 present() { [ -e "$dir/$id" ]; }
-lock_now() {
-    if [ -n "$XPS_LOCK_CMD" ]; then eval "$XPS_LOCK_CMD"
-    elif command -v omarchy-lock-screen >/dev/null 2>&1; then omarchy-lock-screen
-    else loginctl lock-session; fi
-}
-
 was=0; present && was=1
+log "watching for $id (plugged in now: $was)"
 while sleep "$poll"; do
     if present; then was=1
-    elif [ "$was" = 1 ]; then was=0; lock_now; fi
+    elif [ "$was" = 1 ]; then was=0; log "key removed"; lock_now; fi
 done

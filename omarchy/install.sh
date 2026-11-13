@@ -128,7 +128,7 @@ PKGS=(
     # memory safety
     zram-generator earlyoom
     # battery and heat on this laptop, lock-screen module build
-    thermald pam
+    thermald pam python-opencv python-numpy
 )
 if [ "$UPDATED" = 1 ]; then
     say "Installing programs"
@@ -275,6 +275,21 @@ elif curl -fL --retry 3 -o "$MODEL.part" https://huggingface.co/ggerganov/whispe
     mv "$MODEL.part" "$MODEL"; ok "Speech model downloaded"
 else rm -f "$MODEL.part"; bad "Speech model did not download. Run this app again later."; fi
 
+say "Downloading the face check models (about 40 MB)"
+FACE="$HOME/.local/share/xps-models/face"
+get_face() { # name url
+    [ -s "$FACE/$1" ] && return 0
+    curl -fL --retry 3 -o "$FACE/$1.part" "$2" && [ "$(stat -c %s "$FACE/$1.part")" -gt 100000 ] && mv "$FACE/$1.part" "$FACE/$1"
+}
+if [ "$DRY" = 1 ]; then echo "  [dry-run] download face models"
+else
+    mkdir -p "$FACE"
+    if get_face yunet.onnx https://huggingface.co/opencv/face_detection_yunet/resolve/main/face_detection_yunet_2023mar.onnx \
+       && get_face sface.onnx https://huggingface.co/opencv/face_recognition_sface/resolve/main/face_recognition_sface_2021dec.onnx; then
+        ok "Face check models downloaded"
+    else rm -f "$FACE"/*.part; bad "Face models did not download. Run this app again later."; fi
+fi
+
 say "Downloading the AI assistant model (about 1 GB)"
 if [ "$DRY" = 1 ]; then echo "  [dry-run] ollama pull qwen2.5:1.5b"
 elif command -v ollama >/dev/null 2>&1; then
@@ -301,11 +316,17 @@ fi
 # --- self-check: prove it works, do not just trust the steps above -----------------------------------------------
 say "Checking that everything really works"
 if [ "$DRY" != 1 ]; then
-    for c in gnome-system-monitor kdenlive libreoffice nextcloud ollama wtype yad arduino-cli xps-mode xps-dictate xps-assistant xps-panel xps-shortcuts xps-server-setup xps-doctor xps-security xps-usb-watch xps-power xps-terminal xps-login-lock whisper-cli; do
+    for c in gnome-system-monitor kdenlive libreoffice nextcloud ollama wtype yad arduino-cli xps-mode xps-dictate xps-assistant xps-panel xps-shortcuts xps-server-setup xps-doctor xps-security xps-usb-watch xps-power xps-terminal xps-login-lock xps-face whisper-cli; do
         command -v "$c" >/dev/null 2>&1 || bad "'$c' is not installed or not found"
     done
     /usr/bin/python3 -c "import tkinter" >/dev/null 2>&1 || bad "The assistant window needs Python's tk, which is missing"
     [ -f "$HOME/.local/share/xps-models/whisper/ggml-base.en.bin" ] || bad "The speech model is missing"
+    /usr/bin/python3 - <<'PYEOF' >/dev/null 2>&1 || bad "The face models do not load (face check will not work)"
+import cv2, os
+m = os.path.expanduser("~/.local/share/xps-models/face/")
+cv2.FaceDetectorYN.create(m + "yunet.onnx", "", (320, 320))
+cv2.FaceRecognizerSF.create(m + "sface.onnx", "")
+PYEOF
     ollama list 2>/dev/null | grep -q qwen2.5 || { [ -d "$HOME/.ollama/models" ] && ls "$HOME/.ollama/models/manifests" >/dev/null 2>&1; } || bad "The assistant model is missing"
     [ ${#FAILED[@]} -eq 0 ] && ok "All checks passed"
 fi

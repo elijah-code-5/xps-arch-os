@@ -55,6 +55,7 @@ status() {
     local id; id=$(conf_get usb_id)
     if [ -z "$id" ]; then echo "Security: not set up"; return 1; fi
     echo "USB storage key: $id"
+    grep -q '^face=1' "$CONF" 2>/dev/null && echo "Face check: on" || echo "Face check: off"
     [ -e "/dev/disk/by-id/$id" ] && echo "USB key plugged in: yes" || echo "USB key plugged in: no"
     if [ -n "$PAMFILE" ] && grep -q pam_xps "$PAMFILE" 2>/dev/null; then
         echo "Lock screen PAM service ($PAM_SERVICE) uses it: yes"
@@ -210,13 +211,35 @@ enroll() {
     rescue
 }
 
+face_on() {
+    say "Adding the face check (only works with the built-in USB check, not pam_usb mode)"
+    [ -f "$CONF" ] || die "Set up the USB key first (Security setup), then add the face check."
+    grep -q pam_usb "$PAMFILE" 2>/dev/null && die "The face check works with the built-in USB check. Run Security setup (USB key) first to switch to it."
+    command -v xps-face >/dev/null || die "xps-face is missing. Run the XPS Setup app again."
+    xps-face status | grep -q "Models present: yes" || die "The face models are missing. Run the XPS Setup app again (it downloads them)."
+    echo "  Step 1: your face. Sit in normal light, look at the camera."
+    read -r -p "  Press Enter to start. " _
+    xps-face enroll || die "Could not save your face."
+    echo "  Step 2: test. Keep looking at the camera."
+    xps-face verify && ok "The camera recognises you" || die "The camera did not recognise you. Try again in better light."
+    sudo sed -i '/^face=/d' "$CONF" && echo "face=1" | sudo tee -a "$CONF" >/dev/null || die "Could not save the setting."
+    ok "Face check is on: with the key plugged in, your face must also match. Without a match, the recovery code is asked."
+    echo "  Turn it off any time: xps-security face-off"
+}
+face_off() {
+    sudo sed -i '/^face=/d' "$CONF" 2>/dev/null
+    ok "Face check is off (the USB key and password still work)."
+}
+
 case "${1:-}" in
+    face-on)  face_on ;;
+    face-off) face_off ;;
     enroll)  enroll ;;
     enroll-pamusb) XPS_MODE=pamusb; enroll ;;
     status)  status ;;
     test)    test_login "${2:-}" ;;
     disable) disable ;;
-    *) echo "usage: xps-security enroll | enroll-pamusb | status | test [pam-service] | disable"; exit 1 ;;
+    *) echo "usage: xps-security enroll | enroll-pamusb | face-on | face-off | status | test [pam-service] | disable"; exit 1 ;;
 esac
-[ "${1:-}" = enroll ] || [ "${1:-}" = enroll-pamusb ] || [ "${1:-}" = disable ] && { [ -t 0 ] && read -r -p "Press Enter to close. " _; }
+[ "${1:-}" = enroll ] || [ "${1:-}" = enroll-pamusb ] || [ "${1:-}" = face-on ] || [ "${1:-}" = disable ] && { [ -t 0 ] && read -r -p "Press Enter to close. " _; }
 exit 0
