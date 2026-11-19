@@ -1,0 +1,31 @@
+{
+  "name": "ev3-bench",
+  "productName": "EV3 Bench",
+  "version": "1.0.0",
+  "description": "LEGO EV3 robot designer, simulator and code editor",
+  "main": "main.js",
+  "author": "EV3 Bench",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --linux AppImage --publish never"
+  },
+  "dependencies": {
+    "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "local.ev3bench",
+    "productName": "EV3 Bench",
+    "files": ["**/*", "!dist/**", "!node_modules/.cache/**"],
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Education",
+      "icon": "icon.png",
+      "artifactName": "EV3-Bench-${version}-x86_64.AppImage"
+    }
+  }
+}

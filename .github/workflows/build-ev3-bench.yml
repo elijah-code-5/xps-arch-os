@@ -1,0 +1,42 @@
+name: Build EV3 Bench AppImage
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ev3-bench/**"
+      - ".github/workflows/build-ev3-bench.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ev3-bench
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        run: npm install
+
+      - name: Build the AppImage
+        run: npm run dist
+
+      - name: Publish as a release you can download directly
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ev3-bench-latest --yes --cleanup-tag || true
+          gh release create ev3-bench-latest ev3-bench/dist/*.AppImage \
+            --title "EV3 Bench (AppImage)" \
+            --notes "Download the .AppImage, right-click, mark as executable, double-click." \
+            --target "${{ github.sha }}"

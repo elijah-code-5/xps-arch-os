@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}</style>
+<title>EV3 Bench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: workbench. Arena on the left, code and robot setup on the right, podcast shelf underneath. */
+:root{
+  --bg:#EDEFEA; --panel:#FAFBF8; --ink:#1A1F22; --muted:#59646A; --line:#D2D7D0;
+  --accent:#D9480F; --accent-ink:#FFFFFF; --teal:#0B7285; --code-bg:#F2F4EF;
+  --floor:#F7F8F3; --floor-line:#DCE0D8; --track:#14181A; --obs:#8B959B; --wall:#2A3035;
+  --ok:#2B8A3E; --err:#C92A2A;
+  --f-display:'Space Grotesk','Inter',system-ui,sans-serif;
+  --f-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101315; --panel:#181C1F; --ink:#E5E8E9; --muted:#9AA5AB; --line:#2A3136;
+    --accent:#FF8A4C; --accent-ink:#1A0E06; --teal:#5BC0D4; --code-bg:#121618;
+    --floor:#D9DDD6; --floor-line:#C3C8BF; --track:#101315; --obs:#6F7A80; --wall:#0A0C0D;
+    --ok:#69DB7C; --err:#FF8787; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101315; --panel:#181C1F; --ink:#E5E8E9; --muted:#9AA5AB; --line:#2A3136;
+  --accent:#FF8A4C; --accent-ink:#1A0E06; --teal:#5BC0D4; --code-bg:#121618;
+  --floor:#D9DDD6; --floor-line:#C3C8BF; --track:#101315; --obs:#6F7A80; --wall:#0A0C0D;
+  --ok:#69DB7C; --err:#FF8787; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.app{max-width:1280px;margin:0 auto;display:grid;gap:16px}
+h1,h2{font-family:var(--f-display);margin:0;letter-spacing:-.01em}
+h1{font-size:22px}
+h2{font-size:16px}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand svg{flex:none}
+.brand .sub{color:var(--muted);font-size:13px}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.btn,select,input[type=number]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 12px}
+.btn{font-weight:600;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+select{padding-right:6px;max-width:100%}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.status{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;min-width:70px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.status.on .dot{background:var(--ok)}
+.grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0}
+.arena-wrap{aspect-ratio:5/3;width:100%;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--floor)}
+#arena{display:block;width:100%;height:100%}
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;margin-top:10px}
+.chip{border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+.chip span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.chip b{display:block;font-family:var(--f-mono);font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+.tab{font:inherit;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--muted);cursor:pointer}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.row label{color:var(--muted);font-size:13px}
+#code{display:block;width:100%;min-height:300px;resize:vertical;font-family:var(--f-mono);font-size:13px;line-height:1.5;tab-size:2;
+  background:var(--code-bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:10px;white-space:pre;overflow:auto}
+.console{font-family:var(--f-mono);font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:8px;
+  height:130px;overflow:auto;margin-top:8px}
+.console div{white-space:pre-wrap;overflow-wrap:anywhere}
+.console .err{color:var(--err)}
+.console .t{color:var(--muted)}
+details{margin-top:8px;color:var(--muted)}
+summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details pre{font-family:var(--f-mono);font-size:12px;margin:8px 0 0;white-space:pre-wrap;color:var(--ink)}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.fields label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.fields input,.fields select{width:100%}
+.portrow{display:grid;grid-template-columns:56px minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center;margin-bottom:8px}
+.portrow .pn{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.hint{color:var(--muted);font-size:13px;margin:0 0 10px}
+.radio-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+.player{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.player{grid-template-columns:minmax(0,1fr)}}
+.now{font-family:var(--f-display);font-weight:500;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:8px}
+.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.seek{display:flex;gap:10px;align-items:center;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.seek input{flex:1;min-width:0;accent-color:var(--accent)}
+.eps{list-style:none;margin:0;padding:0;max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.eps li button{display:block;width:100%;text-align:left;font:inherit;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);padding:8px 10px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eps li:last-child button{border-bottom:0}
+.eps li button[aria-current="true"]{background:var(--code-bg);font-weight:600;box-shadow:inset 3px 0 0 var(--accent)}
+.empty{padding:14px;color:var(--muted)}
+.drop{outline:2px dashed var(--accent);outline-offset:-6px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+<style>
+/* LEGO system look: blue baseplate, brick panels with studs, chunky brick buttons */
+body{
+  --bg:#0055BF; --panel:#FFFFFF; --ink:#1B2A34; --muted:#51606A; --line:#C9CFD3;
+  --accent:#C91A09; --accent-ink:#FFFFFF; --teal:#0055BF; --code-bg:#F3F4F6;
+  --floor:#F4F4F0; --floor-line:#DDE0DA; --track:#14181A; --obs:#9BA0A3; --wall:#14181A;
+  --ok:#237841; --err:#C91A09; color-scheme:light;
+  background-color:#0055BF;
+  background-image:radial-gradient(circle at 50% 50%,#1565C8 0 7px,#004AA8 7px 9px,transparent 9.5px);
+  background-size:32px 32px;
+}
+h1{color:#fff;text-transform:uppercase;letter-spacing:.04em;font-size:24px}
+.brand .sub{color:#CFE3FF}
+.status{color:#fff}
+.dot{background:#CFE3FF}
+.grid{margin-top:10px}
+.card{position:relative;border:3px solid #14181A;border-radius:6px;box-shadow:0 5px 0 #00306F}
+.card::before{content:"";position:absolute;top:-10px;left:14px;right:14px;height:10px;
+  background:repeating-linear-gradient(90deg,#fff 0 22px,transparent 22px 36px);
+  filter:drop-shadow(1px 0 0 #14181A) drop-shadow(-1px 0 0 #14181A) drop-shadow(0 -1px 0 #14181A)}
+#radio{margin-top:10px}
+.btn{border:2px solid #14181A;border-radius:4px;box-shadow:0 3px 0 #14181A;font-weight:700;background:#F2CD37;color:#14181A}
+.btn:hover{border-color:#14181A;filter:brightness(1.06)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #14181A}
+.btn.primary{background:#C91A09;color:#fff}
+.btn:disabled{box-shadow:0 3px 0 #14181A}
+select,input[type=number]{border:2px solid #14181A;border-radius:4px}
+.tab[aria-selected="true"]{border-bottom:3px solid #F2CD37;color:#14181A}
+.tabs{border-bottom:2px solid #14181A}
+.chip{background:#FFF3B8;border:2px solid #14181A;border-radius:4px}
+.chip span{color:#4A4A3A}
+.arena-wrap{border:3px solid #14181A;border-radius:4px}
+.console,#code,.eps{border:2px solid #14181A}
+.eps li button[aria-current="true"]{background:#FFF3B8;box-shadow:inset 4px 0 0 #C91A09}
+</style>
+
+<style>
+.fields input[type=text],.fields input[type=password]{font:inherit;color:var(--ink);background:var(--panel);border:2px solid #14181A;border-radius:4px;padding:7px 12px;width:100%}
+#ev-code{display:block;width:100%;min-height:200px;resize:vertical;font-family:var(--f-mono);font-size:13px;line-height:1.5;tab-size:4;background:var(--code-bg);color:var(--ink);border:2px solid #14181A;border-radius:6px;padding:10px;white-space:pre;overflow:auto}
+</style>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="34" height="30" viewBox="0 0 34 30" aria-hidden="true"><rect x="1" y="9" width="32" height="20" rx="3" fill="var(--accent)"/><rect x="6" y="3" width="8" height="7" rx="2" fill="var(--accent)"/><rect x="20" y="3" width="8" height="7" rx="2" fill="var(--accent)"/><rect x="7" y="15" width="20" height="8" rx="1.5" fill="var(--panel)" opacity=".9"/></svg>
+      <div><h1>EV3 Bench</h1><div class="sub">Design, simulate and code a LEGO EV3 robot</div></div>
+    </div>
+    <div class="controls">
+      <label class="sr" for="scen" style="position:absolute;left:-9999px">Arena</label>
+      <select id="scen" aria-label="Arena"></select>
+      <select id="spd" aria-label="Simulation speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select>
+      <button class="btn primary" id="run">Run</button>
+      <button class="btn" id="stop" disabled>Stop</button>
+      <button class="btn" id="reset">Reset</button>
+      <span class="status" id="status"><span class="dot"></span><span id="st">Idle</span></span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="card" aria-label="Simulator">
+      <div class="arena-wrap" id="wrap"><canvas id="arena" aria-label="Top-down view of the robot in the arena"></canvas></div>
+      <div class="readout" id="readout"></div>
+    </section>
+
+    <section class="card" aria-label="Editor">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-code" aria-selected="true" aria-controls="p-code">Code</button>
+        <button class="tab" role="tab" id="tab-robot" aria-selected="false" aria-controls="p-robot">Robot</button>
+        <button class="tab" role="tab" id="tab-real" aria-selected="false" aria-controls="p-real">Real EV3</button>
+      </div>
+      <div id="p-code" role="tabpanel" aria-labelledby="tab-code">
+        <div class="row"><label for="ex">Start from</label><select id="ex"></select><span class="hint" style="margin:0">Ctrl+Enter runs</span></div>
+        <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Robot program"></textarea>
+        <div class="console" id="console" aria-live="polite"></div>
+        <details>
+          <summary>Commands</summary>
+<pre>drive(left, right)        both drive motors, -100 to 100
+stop()                    stop all motors
+await move(cm, speed)     drive straight, negative = reverse
+await turn(deg, speed)    spin in place, positive = right
+await wait(ms)            pause (use it inside every loop)
+await until(() => test)   wait until test is true
+touch()  distance()  color()  reflect()  heading()
+gyroReset()               zero the gyro
+motor('A').run(speed)     motor('A').stop()  motor('A').position
+log(...)                  print to the console below</pre>
+        </details>
+      </div>
+      <div id="p-robot" role="tabpanel" aria-labelledby="tab-robot" hidden>
+        <p class="hint">Changes reset the robot to its start spot.</p>
+        <div id="robot-form"></div>
+      </div>
+      <div id="p-real" role="tabpanel" aria-labelledby="tab-real" hidden>
+        <p class="hint">Run Python on a real EV3 with ev3dev. Join it over USB, Bluetooth or Wi-Fi so it has an address, then send the program. Desktop app only.</p>
+        <div class="fields">
+          <label>Brick address<input type="text" id="ev-host" value="ev3dev.local" autocomplete="off"></label>
+          <label>User<input type="text" id="ev-user" value="robot" autocomplete="off"></label>
+          <label>Password<input type="password" id="ev-pass" value="maker" autocomplete="off"></label>
+        </div>
+        <textarea id="ev-code" spellcheck="false" autocomplete="off" aria-label="Python program for the EV3"></textarea>
+        <div class="row" style="margin-top:8px"><button class="btn primary" id="ev-run">Send and run</button><button class="btn" id="ev-stop">Stop on brick</button></div>
+        <div class="console" id="ev-out" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="card" id="radio" aria-label="Bench Radio">
+    <div class="radio-head"><h2>Bench Radio</h2><span class="hint" style="margin:0">Podcasts for long build sessions. Files stay on this device.</span></div>
+    <div class="player">
+      <div>
+        <div class="now" id="now">Nothing loaded</div>
+        <div class="transport">
+          <button class="btn" id="pc-back" aria-label="Back 15 seconds">-15s</button>
+          <button class="btn primary" id="pc-play">Play</button>
+          <button class="btn" id="pc-fwd" aria-label="Forward 30 seconds">+30s</button>
+          <select id="pc-rate" aria-label="Playback speed"><option value="0.8">0.8x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select>
+        </div>
+        <div class="seek"><span id="pc-cur">0:00</span><input type="range" id="pc-seek" min="0" max="1000" value="0" aria-label="Seek"><span id="pc-dur">0:00</span></div>
+        <audio id="pc-audio" preload="metadata"></audio>
+      </div>
+      <div>
+        <div class="row"><button class="btn" id="pc-add">Add episodes</button><span class="hint" style="margin:0">mp3, m4a, ogg, wav. Drop files here too.</span></div>
+        <input type="file" id="pc-files" multiple accept="audio/*" hidden>
+        <ul class="eps" id="pc-list"></ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r)=>(r||document).querySelector(s);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const r1=v=>Math.round(v*10)/10;
+const D2R=Math.PI/180,R2D=180/Math.PI;
+const W=200,H=120,BR=9,MAXDPS=900,SD=1/120;   // arena cm, robot radius cm, motor deg/s at 100%, physics step
+
+/* ---------- world ---------- */
+const MOUNTS={
+  front:{f:8,l:0,a:0,label:'Front'},
+  frontLeft:{f:8,l:-4,a:-20,label:'Front left'},
+  frontRight:{f:8,l:4,a:20,label:'Front right'},
+  left:{f:0,l:-6,a:-90,label:'Left side'},
+  right:{f:0,l:6,a:90,label:'Right side'},
+  rear:{f:-8,l:0,a:180,label:'Rear'}
+};
+const TYPES={none:'Empty',touch:'Touch',color:'Colour',ultrasonic:'Ultrasonic',gyro:'Gyro'};
+const REFLECT={white:92,black:4,red:38,green:33,blue:22,yellow:78};
+const SCEN={
+  line:{label:'Line track',start:{x:100,y:90,th:0},obs:[],patches:[],track:{cx:100,cy:60,L:100,r:30,w:3}},
+  course:{label:'Obstacle course',start:{x:18,y:60,th:0},
+    obs:[{x:60,y:0,w:10,h:70},{x:105,y:50,w:10,h:70},{x:145,y:15,w:10,h:55}],
+    patches:[{x:172,y:45,w:22,h:30,name:'green',col:'#2F9E44'}],track:null},
+  open:{label:'Colour patches',start:{x:100,y:60,th:0},obs:[{x:30,y:20,w:14,h:14}],
+    patches:[{x:15,y:75,w:30,h:30,name:'red',col:'#E03131'},{x:155,y:10,w:30,h:30,name:'blue',col:'#1C7ED6'},
+             {x:155,y:80,w:30,h:30,name:'yellow',col:'#F2C100'},{x:80,y:5,w:30,h:16,name:'green',col:'#2F9E44'}],track:null}
+};
+let sc=SCEN.line;
+const cfg={leftPort:'B',rightPort:'C',wheelD:5.6,track:12,
+  ports:{1:{type:'touch',mount:'front'},2:{type:'color',mount:'front'},3:{type:'ultrasonic',mount:'front'},4:{type:'gyro',mount:'front'}}};
+const mk=()=>({cmd:0,spd:0,pos:0});
+const motors={A:mk(),B:mk(),C:mk(),D:mk()};
+const sim={t:0,odo:0,gyro:0,gyroZero:0};
+let bot={x:100,y:90,th:0},trail=[],timers=[],token=0,running=false,speed=1;
+
+function floorAt(x,y){
+  if(x<0||y<0||x>W||y>H) return 'white';
+  for(const p of sc.patches) if(x>=p.x&&x<=p.x+p.w&&y>=p.y&&y<=p.y+p.h) return p.name;
+  const t=sc.track;
+  if(t){const dx=Math.max(Math.abs(x-t.cx)-t.L/2,0),dy=y-t.cy;if(Math.abs(Math.hypot(dx,dy)-t.r)<=t.w/2) return 'black';}
+  return 'white';
+}
+function rayRect(ox,oy,dx,dy,r){
+  let t0=0,t1=Infinity;
+  if(Math.abs(dx)<1e-9){if(ox<r.x||ox>r.x+r.w)return Infinity;}
+  else{let a=(r.x-ox)/dx,b=(r.x+r.w-ox)/dx;if(a>b){const q=a;a=b;b=q;}t0=Math.max(t0,a);t1=Math.min(t1,b);}
+  if(Math.abs(dy)<1e-9){if(oy<r.y||oy>r.y+r.h)return Infinity;}
+  else{let a=(r.y-oy)/dy,b=(r.y+r.h-oy)/dy;if(a>b){const q=a;a=b;b=q;}t0=Math.max(t0,a);t1=Math.min(t1,b);}
+  return t0<=t1?t0:Infinity;
+}
+function ray(ox,oy,a){
+  const dx=Math.cos(a),dy=Math.sin(a);let t=Infinity;
+  if(dx>1e-9)t=Math.min(t,(W-ox)/dx);else if(dx<-1e-9)t=Math.min(t,-ox/dx);
+  if(dy>1e-9)t=Math.min(t,(H-oy)/dy);else if(dy<-1e-9)t=Math.min(t,-oy/dy);
+  for(const r of sc.obs)t=Math.min(t,rayRect(ox,oy,dx,dy,r));
+  return Math.max(0,t);
+}
+function hits(x,y){
+  if(x<BR||y<BR||x>W-BR||y>H-BR)return true;
+  for(const r of sc.obs){const cx=clamp(x,r.x,r.x+r.w),cy=clamp(y,r.y,r.y+r.h);if((x-cx)*(x-cx)+(y-cy)*(y-cy)<BR*BR)return true;}
+  return false;
+}
+function mountPos(m){
+  const fx=Math.cos(bot.th),fy=Math.sin(bot.th),rx=-Math.sin(bot.th),ry=Math.cos(bot.th);
+  return {x:bot.x+m.f*fx+m.l*rx,y:bot.y+m.f*fy+m.l*ry,a:bot.th+m.a*D2R};
+}
+function step(dt){
+  for(const k in motors){const m=motors[k];m.spd+=(m.cmd/100*MAXDPS-m.spd)*Math.min(1,dt*10);m.pos+=m.spd*dt;}
+  const vl=motors[cfg.leftPort].spd*D2R*cfg.wheelD/2,vr=motors[cfg.rightPort].spd*D2R*cfg.wheelD/2;
+  const v=(vl+vr)/2,w=(vl-vr)/cfg.track;
+  let nx=bot.x+Math.cos(bot.th+w*dt/2)*v*dt,ny=bot.y+Math.sin(bot.th+w*dt/2)*v*dt;
+  if(hits(nx,ny)){if(!hits(nx,bot.y))ny=bot.y;else if(!hits(bot.x,ny))nx=bot.x;else{nx=bot.x;ny=bot.y;}}
+  bot.x=nx;bot.y=ny;bot.th+=w*dt;
+  sim.gyro+=w*dt*R2D;sim.odo+=v*dt;sim.t+=dt;
+  const lp=trail[trail.length-1];
+  if(!lp||Math.hypot(bot.x-lp.x,bot.y-lp.y)>2){trail.push({x:bot.x,y:bot.y});if(trail.length>700)trail.shift();}
+  if(timers.length){const due=[],rest=[];for(const T of timers)(T.t<=sim.t?due:rest).push(T);timers=rest;due.forEach(T=>T.res());}
+}
+
+/* ---------- robot API (what your program can call) ---------- */
+const STOP=()=>{const e=new Error('stopped');e.stop=true;return e;};
+function wait(ms){
+  const p=new Promise((res,rej)=>{timers.push({t:sim.t+Math.max(0,ms)/1000,res,rej});});
+  p.catch(()=>{});return p;
+}
+async function until(fn,timeout){
+  const lim=timeout==null?60000:timeout,t0=sim.t;
+  while(!fn()){if((sim.t-t0)*1000>lim)throw new Error('until() timed out');await wait(10);}
+}
+function drive(l,r){motors[cfg.leftPort].cmd=clamp(+l||0,-100,100);motors[cfg.rightPort].cmd=clamp(+r||0,-100,100);}
+function stop(){for(const k in motors)motors[k].cmd=0;}
+async function move(cm,speed){
+  const sp=Math.abs(speed==null?50:speed),dir=Math.sign(cm)||1,goal=Math.abs(cm),o0=sim.odo;
+  for(;;){const rem=goal-(sim.odo-o0)*dir;if(rem<=0.3)break;const s=clamp(rem*4,14,sp);drive(dir*s,dir*s);await wait(10);}
+  stop();await wait(60);
+}
+async function turn(deg,speed){
+  const sp=Math.abs(speed==null?40:speed),dir=Math.sign(deg)||1,goal=Math.abs(deg),g0=sim.gyro;
+  for(;;){const rem=goal-(sim.gyro-g0)*dir;if(rem<=0.6)break;const s=clamp(rem*1.1,10,sp);drive(dir*s,-dir*s);await wait(10);}
+  stop();await wait(60);
+}
+function pick(type,port){
+  const list=Object.keys(cfg.ports).filter(p=>cfg.ports[p].type===type&&(port==null||+p===+port));
+  if(!list.length)throw new Error(port==null?'No '+TYPES[type].toLowerCase()+' sensor set up. Add one in the Robot tab.':'Port '+port+' has no '+TYPES[type].toLowerCase()+' sensor.');
+  return cfg.ports[list[0]];
+}
+function touch(port){
+  const c=pick('touch',port),m=mountPos(MOUNTS[c.mount]);
+  const x=bot.x+Math.cos(m.a)*(BR+1.5),y=bot.y+Math.sin(m.a)*(BR+1.5);
+  if(x<0||y<0||x>W||y>H)return true;
+  for(const r of sc.obs)if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return true;
+  return false;
+}
+function distance(port){
+  const c=pick('ultrasonic',port),m=mountPos(MOUNTS[c.mount]),d=ray(m.x,m.y,m.a);
+  return d>=250?255:Math.max(3,r1(d));
+}
+function color(port){const c=pick('color',port),m=mountPos(MOUNTS[c.mount]);return floorAt(m.x,m.y);}
+function reflect(port){return REFLECT[color(port)];}
+function heading(port){pick('gyro',port);return r1(sim.gyro-sim.gyroZero);}
+function gyroReset(){sim.gyroZero=sim.gyro;}
+function motor(p){
+  p=String(p).toUpperCase();if(!motors[p])throw new Error('Motor port must be A, B, C or D');
+  return {run(s){motors[p].cmd=clamp(+s||0,-100,100);},stop(){motors[p].cmd=0;},get position(){return Math.round(motors[p].pos);}};
+}
+function log(){clog(Array.prototype.map.call(arguments,a=>typeof a==='object'?JSON.stringify(a):String(a)).join(' '));}
+const api={drive,stop,move,turn,wait,until,touch,distance,color,reflect,heading,gyroReset,motor,log};
+const API_NAMES=Object.keys(api),API_VALUES=API_NAMES.map(k=>api[k]);
+
+/* ---------- example programs (plain functions so they also run if typed code is blocked) ---------- */
+async function exSquare(){
+  // Drive a 40 cm square, then report the gyro heading.
+  gyroReset();
+  for (let i = 0; i < 4; i++) {
+    await move(40, 60);   // distance in cm, speed in %
+    await turn(90, 50);   // degrees, positive turns right
+  }
+  log('Square done. Heading:', heading());
+}
+async function exLine(){
+  // Follow the edge of the black line with the colour sensor.
+  while (true) {
+    if (reflect() < 50) drive(60, 15);   // on the line: curve right
+    else drive(15, 60);                  // off the line: curve left
+    await wait(10);
+  }
+}
+async function exAvoid(){
+  // Wander around and turn away from anything the ultrasonic sensor sees.
+  while (true) {
+    drive(50, 50);
+    if (distance() < 22) {
+      await move(-8, 40);
+      await turn(Math.random() < 0.5 ? 90 : -90, 50);
+    }
+    await wait(10);
+  }
+}
+async function exGreen(){
+  // Avoid walls until the colour sensor finds the green zone.
+  while (color() !== 'green') {
+    drive(50, 50);
+    if (distance() < 22 || touch()) {
+      await move(-8, 40);
+      await turn(Math.random() < 0.5 ? 90 : -90, 50);
+    }
+    await wait(10);
+  }
+  stop();
+  log('Green zone reached in', r1(sim.t), 'seconds');
+}
+const EXAMPLES=[
+  {id:'square',label:'Drive a square',fn:exSquare,scen:'open'},
+  {id:'line',label:'Line follower',fn:exLine,scen:'line'},
+  {id:'avoid',label:'Obstacle avoider',fn:exAvoid,scen:'course'},
+  {id:'green',label:'Find the green zone',fn:exGreen,scen:'course'}
+];
+function bodyOf(fn){
+  const s=fn.toString(),i=s.indexOf('{'),j=s.lastIndexOf('}');
+  const lines=s.slice(i+1,j).replace(/^\n/,'').split('\n');
+  const ind=Math.min.apply(null,lines.filter(l=>l.trim()).map(l=>l.match(/^ */)[0].length));
+  return lines.map(l=>l.slice(ind)).join('\n').replace(/\s+$/,'')+'\n';
+}
+
+/* ---------- program runner ---------- */
+const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+const ed=$('#code'),con=$('#console');
+function clog(msg,cls){
+  const d=document.createElement('div');if(cls)d.className=cls;
+  const t=document.createElement('span');t.className='t';t.textContent=(r1(sim.t)+'s').padStart(7)+'  ';
+  d.appendChild(t);d.appendChild(document.createTextNode(msg));con.appendChild(d);
+  while(con.childNodes.length>150)con.removeChild(con.firstChild);
+  con.scrollTop=con.scrollHeight;
+}
+function ui(){
+  $('#stop').disabled=!running;$('#st').textContent=running?'Running':'Idle';$('#status').classList.toggle('on',running);
+}
+function stopProgram(silent){
+  const was=running;token++;running=false;stop();
+  const ts=timers;timers=[];ts.forEach(T=>T.rej(STOP()));
+  if(was&&!silent)clog('Stopped');
+  ui();
+}
+function resetSim(){
+  const s=sc.start;bot={x:s.x,y:s.y,th:s.th};
+  sim.t=0;sim.odo=0;sim.gyro=0;sim.gyroZero=0;trail=[{x:s.x,y:s.y}];
+  for(const k in motors){motors[k].cmd=0;motors[k].spd=0;motors[k].pos=0;}
+}
+async function runProgram(){
+  stopProgram(true);resetSim();
+  const tok=++token;running=true;ui();
+  const src=ed.value;let fn;
+  try{fn=new AsyncFunction(...API_NAMES,src);}
+  catch(e){
+    if(e instanceof SyntaxError){clog('Syntax error: '+e.message,'err');running=false;ui();return;}
+    const ex=EXAMPLES.find(x=>bodyOf(x.fn).trim()===src.trim());
+    if(!ex){clog('This page does not allow running edited code. Open the downloaded ev3-bench.html file in your browser instead.','err');running=false;ui();return;}
+    fn=ex.fn;
+  }
+  clog('Program started');
+  try{await fn(...API_VALUES);if(tok===token)clog('Program finished');}
+  catch(e){if(!(e&&e.stop)&&tok===token)clog(String(e&&e.message||e),'err');}
+  finally{if(tok===token){running=false;stop();ui();}}
+}
+
+/* ---------- drawing ---------- */
+const cv=$('#arena'),ctx=cv.getContext('2d');
+function sizeCanvas(){
+  const w=$('#wrap').clientWidth,dpr=window.devicePixelRatio||1;
+  cv.width=Math.max(10,Math.round(w*dpr));cv.height=Math.round(cv.width*H/W);
+}
+function rr(x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);}
+function draw(){
+  const cs=getComputedStyle(document.body),c=n=>cs.getPropertyValue(n).trim();
+  const s=cv.width/W;ctx.setTransform(s,0,0,s,0,0);
+  ctx.fillStyle=c('--floor');ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle=c('--floor-line');ctx.lineWidth=.15;ctx.beginPath();
+  for(let x=10;x<W;x+=10){ctx.moveTo(x,0);ctx.lineTo(x,H);}
+  for(let y=10;y<H;y+=10){ctx.moveTo(0,y);ctx.lineTo(W,y);}
+  ctx.stroke();
+  for(const p of sc.patches){ctx.fillStyle=p.col;ctx.fillRect(p.x,p.y,p.w,p.h);}
+  const t=sc.track;
+  if(t){
+    ctx.strokeStyle=c('--track');ctx.lineWidth=t.w;ctx.lineJoin='round';ctx.beginPath();
+    ctx.moveTo(t.cx-t.L/2,t.cy-t.r);ctx.lineTo(t.cx+t.L/2,t.cy-t.r);ctx.arc(t.cx+t.L/2,t.cy,t.r,-Math.PI/2,Math.PI/2);
+    ctx.lineTo(t.cx-t.L/2,t.cy+t.r);ctx.arc(t.cx-t.L/2,t.cy,t.r,Math.PI/2,Math.PI*1.5);ctx.closePath();ctx.stroke();
+  }
+  ctx.fillStyle=c('--obs');ctx.strokeStyle=c('--wall');ctx.lineWidth=.6;
+  for(const r of sc.obs){ctx.fillRect(r.x,r.y,r.w,r.h);ctx.strokeRect(r.x,r.y,r.w,r.h);}
+  ctx.strokeStyle=c('--wall');ctx.lineWidth=1.4;ctx.strokeRect(.7,.7,W-1.4,H-1.4);
+  if(trail.length>1){
+    ctx.strokeStyle=c('--accent');ctx.globalAlpha=.45;ctx.lineWidth=.8;ctx.lineJoin='round';ctx.beginPath();
+    trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.globalAlpha=1;
+  }
+  for(const p in cfg.ports){
+    const pc=cfg.ports[p];if(pc.type!=='ultrasonic')continue;
+    const m=mountPos(MOUNTS[pc.mount]),d=Math.min(ray(m.x,m.y,m.a),120);
+    ctx.strokeStyle=c('--teal');ctx.globalAlpha=.6;ctx.lineWidth=.35;ctx.setLineDash([1.5,1.5]);
+    ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(m.x+Math.cos(m.a)*d,m.y+Math.sin(m.a)*d);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+  }
+  ctx.save();ctx.translate(bot.x,bot.y);ctx.rotate(bot.th);
+  const tw=cfg.track,wd=cfg.wheelD;
+  ctx.fillStyle='#202628';
+  ctx.fillRect(-wd/2,-tw/2-1.2,wd,2.4);ctx.fillRect(-wd/2,tw/2-1.2,wd,2.4);
+  ctx.fillStyle='#A4ADB2';ctx.strokeStyle='#3B4448';ctx.lineWidth=.5;
+  rr(-9.5,-(tw/2-1.4),19,tw-2.8,1.5);ctx.fill();ctx.stroke();
+  ctx.fillStyle=c('--accent');ctx.beginPath();ctx.moveTo(10.2,0);ctx.lineTo(6,-2.6);ctx.lineTo(6,2.6);ctx.closePath();ctx.fill();
+  for(const p in cfg.ports){
+    const pc=cfg.ports[p];if(pc.type==='none'||pc.type==='gyro')continue;
+    const m=MOUNTS[pc.mount];
+    ctx.fillStyle=pc.type==='touch'?'#E03131':pc.type==='color'?'#F2C100':c('--teal');
+    ctx.strokeStyle='#14181A';ctx.lineWidth=.3;ctx.beginPath();ctx.arc(m.f,m.l,1.5,0,7);ctx.fill();ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ---------- readout ---------- */
+const chips={};
+function buildReadout(){
+  const box=$('#readout');box.innerHTML='';
+  const add=(k,label)=>{const d=document.createElement('div');d.className='chip';d.innerHTML='<span></span><b>-</b>';d.firstChild.textContent=label;box.appendChild(d);chips[k]=d.lastChild;};
+  for(const p of [1,2,3,4])add('p'+p,'Port '+p+' '+TYPES[cfg.ports[p].type].toLowerCase());
+  add('t','Time');add('pos','Position cm');add('hd','Facing deg');
+}
+function peek(p){
+  const c=cfg.ports[p];
+  try{
+    if(c.type==='touch')return touch(p)?'pressed':'released';
+    if(c.type==='color'){const n=color(p);return n+' '+REFLECT[n];}
+    if(c.type==='ultrasonic')return distance(p)+' cm';
+    if(c.type==='gyro')return heading(p)+' deg';
+  }catch(e){}
+  return '-';
+}
+function updateReadout(){
+  for(const p of [1,2,3,4])chips['p'+p].textContent=peek(p);
+  chips.t.textContent=r1(sim.t)+' s';
+  chips.pos.textContent=Math.round(bot.x)+', '+Math.round(bot.y);
+  let a=(bot.th*R2D)%360;if(a<0)a+=360;chips.hd.textContent=Math.round(a);
+}
+
+/* ---------- robot form ---------- */
+function buildRobotForm(){
+  const opt=(o,sel)=>Object.keys(o).map(k=>'<option value="'+k+'"'+(k===sel?' selected':'')+'>'+o[k]+'</option>').join('');
+  const portOpts=sel=>['A','B','C','D'].map(p=>'<option'+(p===sel?' selected':'')+'>'+p+'</option>').join('');
+  const mounts={};Object.keys(MOUNTS).forEach(k=>mounts[k]=MOUNTS[k].label);
+  let rows='';
+  for(const p of [1,2,3,4]){
+    const c=cfg.ports[p],dis=(c.type==='none'||c.type==='gyro')?' disabled':'';
+    rows+='<div class="portrow"><span class="pn">Port '+p+'</span>'+
+      '<select data-p="'+p+'" data-k="type" aria-label="Port '+p+' sensor">'+opt(TYPES,c.type)+'</select>'+
+      '<select data-p="'+p+'" data-k="mount" aria-label="Port '+p+' position"'+dis+'>'+opt(mounts,c.mount)+'</select></div>';
+  }
+  $('#robot-form').innerHTML=
+    '<div class="fields">'+
+    '<label>Left drive motor<select id="lp">'+portOpts(cfg.leftPort)+'</select></label>'+
+    '<label>Right drive motor<select id="rp">'+portOpts(cfg.rightPort)+'</select></label>'+
+    '<label>Wheel diameter (cm)<input type="number" id="wd" min="3" max="10" step="0.1" value="'+cfg.wheelD+'"></label>'+
+    '<label>Wheel spacing (cm)<input type="number" id="tw" min="8" max="20" step="0.5" value="'+cfg.track+'"></label></div>'+
+    '<h2 style="margin-bottom:8px">Sensors</h2>'+rows+
+    '<p class="hint">Colour sensors read the floor under their position. Ultrasonic sensors look along their direction. Touch sensors act as a front bumper.</p>';
+}
+$('#robot-form').addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='lp')cfg.leftPort=t.value;
+  else if(t.id==='rp')cfg.rightPort=t.value;
+  else if(t.id==='wd')cfg.wheelD=clamp(parseFloat(t.value)||5.6,3,10);
+  else if(t.id==='tw')cfg.track=clamp(parseFloat(t.value)||12,8,20);
+  else if(t.dataset.p)cfg.ports[t.dataset.p][t.dataset.k]=t.value;
+  stopProgram(true);resetSim();buildRobotForm();buildReadout();
+});
+
+/* ---------- controls ---------- */
+const scenSel=$('#scen');
+Object.keys(SCEN).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=SCEN[k].label;scenSel.appendChild(o);});
+function setScenario(k){sc=SCEN[k];scenSel.value=k;stopProgram(true);resetSim();}
+scenSel.addEventListener('change',()=>setScenario(scenSel.value));
+$('#spd').addEventListener('change',e=>{speed=parseFloat(e.target.value)||1;});
+$('#run').addEventListener('click',runProgram);
+$('#stop').addEventListener('click',()=>stopProgram());
+$('#reset').addEventListener('click',()=>{stopProgram(true);resetSim();clog('Reset');});
+const exSel=$('#ex');
+exSel.innerHTML='<option value="">Your code</option>'+EXAMPLES.map(x=>'<option value="'+x.id+'">'+x.label+'</option>').join('');
+exSel.addEventListener('change',()=>{
+  const x=EXAMPLES.find(e=>e.id===exSel.value);if(!x)return;
+  ed.value=bodyOf(x.fn);setScenario(x.scen);save();
+});
+function save(){try{localStorage.setItem('ev3bench.code',ed.value);}catch(e){}}
+ed.addEventListener('input',()=>{exSel.value='';save();});
+ed.addEventListener('keydown',e=>{
+  if(e.key==='Tab'){e.preventDefault();ed.setRangeText('  ',ed.selectionStart,ed.selectionEnd,'end');}
+  else if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();runProgram();}
+});
+function showTab(name){
+  for(const n of ['code','robot','real']){
+    $('#tab-'+n).setAttribute('aria-selected',String(n===name));$('#p-'+n).hidden=n!==name;
+  }
+}
+$('#tab-code').addEventListener('click',()=>showTab('code'));
+$('#tab-robot').addEventListener('click',()=>showTab('robot'));
+$('#tab-real').addEventListener('click',()=>showTab('real'));
+
+/* ---------- real EV3 (desktop app only) ---------- */
+const ev=window.ev3bench;
+const evOut=$('#ev-out');
+function evlog(msg,cls){
+  const d=document.createElement('div');if(cls)d.className=cls;d.textContent=msg;evOut.appendChild(d);
+  while(evOut.childNodes.length>200)evOut.removeChild(evOut.firstChild);evOut.scrollTop=evOut.scrollHeight;
+}
+$('#ev-code').value="#!/usr/bin/env python3\n# Runs on the real EV3 (ev3dev). Motors on ports B and C.\nfrom ev3dev2.motor import MoveTank, OUTPUT_B, OUTPUT_C, SpeedPercent\n\ntank = MoveTank(OUTPUT_B, OUTPUT_C)\ntank.on_for_rotations(SpeedPercent(50), SpeedPercent(50), 3)\ntank.on_for_degrees(SpeedPercent(40), SpeedPercent(-40), 360)\nprint('done')\n";
+if(ev)ev.onOutput(d=>evlog(d.text.replace(/\n$/,''),d.err?'err':''));
+$('#ev-run').addEventListener('click',async()=>{
+  if(!ev){evlog('Real EV3 needs the desktop app.','err');return;}
+  evlog('Connecting to '+$('#ev-host').value+' ...');
+  try{await ev.run({host:$('#ev-host').value.trim(),user:$('#ev-user').value.trim(),password:$('#ev-pass').value,code:$('#ev-code').value});}
+  catch(err){evlog('Could not run: '+(err&&err.message||err),'err');}
+});
+$('#ev-stop').addEventListener('click',async()=>{if(ev){try{await ev.stop();evlog('Stopped');}catch(err){}}});
+
+/* ---------- podcast ---------- */
+const au=$('#pc-audio'),pc={items:[],i:-1};
+const fmt=s=>{if(!isFinite(s))return '0:00';s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+function renderList(){
+  const ul=$('#pc-list');ul.innerHTML='';
+  if(!pc.items.length){const li=document.createElement('li');li.className='empty';li.textContent='No episodes yet. Add audio files from your computer.';ul.appendChild(li);return;}
+  pc.items.forEach((it,i)=>{
+    const li=document.createElement('li'),b=document.createElement('button');
+    b.textContent=it.name;b.title=it.name;if(i===pc.i)b.setAttribute('aria-current','true');
+    b.addEventListener('click',()=>play(i,true));li.appendChild(b);ul.appendChild(li);
+  });
+}
+function play(i,go){
+  pc.i=i;au.src=pc.items[i].url;au.playbackRate=parseFloat($('#pc-rate').value)||1;
+  $('#now').textContent=pc.items[i].name;renderList();
+  if(go)au.play().catch(()=>{});
+}
+function addFiles(files){
+  for(const f of files){
+    if(!(f.type&&f.type.indexOf('audio/')===0)&&!/\.(mp3|m4a|aac|ogg|opus|wav|flac)$/i.test(f.name))continue;
+    pc.items.push({name:f.name.replace(/\.[^.]+$/,'').replace(/[_]+/g,' '),url:URL.createObjectURL(f)});
+  }
+  if(pc.i<0&&pc.items.length)play(0,false);else renderList();
+}
+$('#pc-add').addEventListener('click',()=>$('#pc-files').click());
+$('#pc-files').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
+const rs=$('#radio');
+['dragenter','dragover'].forEach(n=>rs.addEventListener(n,e=>{e.preventDefault();rs.classList.add('drop');}));
+['dragleave','drop'].forEach(n=>rs.addEventListener(n,e=>{e.preventDefault();rs.classList.remove('drop');}));
+rs.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files)addFiles(e.dataTransfer.files);});
+$('#pc-play').addEventListener('click',()=>{
+  if(pc.i<0){$('#pc-files').click();return;}
+  if(au.paused)au.play().catch(()=>{});else au.pause();
+});
+$('#pc-back').addEventListener('click',()=>{au.currentTime=Math.max(0,au.currentTime-15);});
+$('#pc-fwd').addEventListener('click',()=>{au.currentTime=Math.min(au.duration||1e9,au.currentTime+30);});
+$('#pc-rate').addEventListener('change',e=>{au.playbackRate=parseFloat(e.target.value)||1;});
+$('#pc-seek').addEventListener('input',e=>{if(au.duration)au.currentTime=au.duration*e.target.value/1000;});
+au.addEventListener('timeupdate',()=>{
+  $('#pc-cur').textContent=fmt(au.currentTime);
+  if(au.duration)$('#pc-seek').value=Math.round(au.currentTime/au.duration*1000);
+});
+au.addEventListener('loadedmetadata',()=>{$('#pc-dur').textContent=fmt(au.duration);au.playbackRate=parseFloat($('#pc-rate').value)||1;});
+au.addEventListener('play',()=>{$('#pc-play').textContent='Pause';});
+au.addEventListener('pause',()=>{$('#pc-play').textContent='Play';});
+au.addEventListener('ended',()=>{if(pc.i+1<pc.items.length)play(pc.i+1,true);});
+renderList();
+
+/* ---------- start ---------- */
+let saved=null;try{saved=localStorage.getItem('ev3bench.code');}catch(e){}
+if(saved){ed.value=saved;exSel.value='';}
+else{ed.value=bodyOf(EXAMPLES[1].fn);exSel.value='line';}
+buildRobotForm();buildReadout();
+setScenario(saved?'line':'line');
+sizeCanvas();
+if(window.ResizeObserver)new ResizeObserver(sizeCanvas).observe($('#wrap'));else window.addEventListener('resize',sizeCanvas);
+let last=0,acc=0;
+function frame(ts){
+  if(!last)last=ts;
+  const dt=Math.min(.1,(ts-last)/1000);last=ts;acc+=dt*speed;
+  let n=0;while(acc>=SD&&n<80){step(SD);acc-=SD;n++;}
+  if(n>=80)acc=0;
+  draw();updateReadout();requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
